@@ -14,12 +14,14 @@ export default function OnboardingPage() {
 
   // Timer for splash screen
   useEffect(() => {
+    // Ensure splash is visible on mount
+    setIsSplashVisible(true); 
     const timer = setTimeout(() => {
       setIsSplashVisible(false);
     }, 3000); // 3 seconds
 
     return () => clearTimeout(timer); // Cleanup timer on component unmount
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount (per page load/reload)
 
   // Redirection logic based on auth state and splash visibility
   useEffect(() => {
