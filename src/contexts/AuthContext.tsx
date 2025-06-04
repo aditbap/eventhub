@@ -92,13 +92,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
   
   useEffect(() => {
+    const allowedUnauthenticatedPaths = [
+      '/login',
+      '/register',
+      '/reset-password',
+      '/new-password', // Add new-password page here
+      '/' // Onboarding/splash page
+    ];
+
     if (
       !loading &&
       !user &&
-      !pathname.startsWith('/login') &&
-      !pathname.startsWith('/register') &&
-      !pathname.startsWith('/reset-password') && // Allow access to reset-password page
-      pathname !== '/'
+      !allowedUnauthenticatedPaths.some(p => pathname.startsWith(p)) &&
+      pathname !== '/' // Double check for root, though startsWith('/') handles it
     ) {
       router.push('/login');
     }
