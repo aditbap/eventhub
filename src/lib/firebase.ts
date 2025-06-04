@@ -3,14 +3,19 @@ import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
-// TODO: Replace with your actual Firebase project configuration
+// ==========================================================================================
+// !! PENTING !!
+// GANTI NILAI PLACEHOLDER DI BAWAH INI DENGAN KONFIGURASI PROYEK FIREBASE ANDA YANG SEBENARNYA
+// Anda bisa mendapatkan ini dari Firebase Console:
+// Project settings > General > Your apps > Firebase SDK snippet > Config
+// ==========================================================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "YOUR_API_KEY", // <-- GANTI INI
+  authDomain: "YOUR_AUTH_DOMAIN", // <-- GANTI INI
+  projectId: "YOUR_PROJECT_ID", // <-- GANTI INI
+  storageBucket: "YOUR_STORAGE_BUCKET", // <-- GANTI INI
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // <-- GANTI INI
+  appId: "YOUR_APP_ID" // <-- GANTI INI
 };
 
 // Initialize Firebase
