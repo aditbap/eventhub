@@ -1,3 +1,4 @@
+
 import type { SVGProps } from 'react';
 
 export function UpjLogo(props: SVGProps<SVGSVGElement>) {
@@ -6,7 +7,7 @@ export function UpjLogo(props: SVGProps<SVGSVGElement>) {
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 160 50" // Aspect ratio approx 3.2:1
-      aria-label="UPJ Event Hub Logo"
+      aria-label="UPJ EventHub text with logo on the left side"
       {...props}
     >
       {/* Icon Group: Vertically centered (y=5 for height 40 in viewbox height 50) */}
