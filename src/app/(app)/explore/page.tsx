@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -87,6 +88,36 @@ const MOCK_EVENTS: Event[] = [
       { id: 'd3', avatarUrl: 'https://placehold.co/32x32.png?text=K', name: 'User K' },
     ]
   },
+  { 
+    id: '7', 
+    title: 'Weekend Food Bazaar', 
+    description: 'Explore diverse culinary delights at our weekend food bazaar. Many stalls to choose from!', 
+    date: '2024-09-21', 
+    time: '11:00', 
+    location: 'City Park Bintaro', 
+    category: 'Food', 
+    imageUrl: 'https://placehold.co/300x200.png', 
+    imageHint: 'food bazaar', 
+    attendanceCount: 180, 
+    price: 5,
+    attendees: [
+      { id: 'e1', avatarUrl: 'https://placehold.co/32x32.png?text=L', name: 'User L' },
+      { id: 'e2', avatarUrl: 'https://placehold.co/32x32.png?text=M', name: 'User M' },
+    ]
+  },
+  { 
+    id: '8', 
+    title: 'Intro to Coding Workshop', 
+    description: 'Learn the basics of coding in this interactive workshop. No prior experience needed.', 
+    date: '2024-10-05', 
+    time: '10:00', 
+    location: 'Community Hub UPJ', 
+    category: 'Tech', 
+    imageUrl: 'https://placehold.co/100x100.png', 
+    imageHint: 'coding workshop', 
+    attendanceCount: 75, 
+    price: 0 
+  },
 ];
 
 export default function ExplorePage() {
@@ -134,7 +165,7 @@ export default function ExplorePage() {
   }, [searchQuery, currentCategory]);
 
   const upcomingEvents = filteredEvents.filter(e => new Date(e.date) >= new Date() && e.attendees).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
-  const nearYouEvents = filteredEvents.filter(e => !e.attendees).slice(0, 5); // Mocking "Near You" with events that don't have detailed attendee list for card variant
+  const nearYouEvents = filteredEvents.filter(e => !e.attendees && new Date(e.date) >= new Date()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5); // Also ensure near you events are upcoming
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -199,7 +230,7 @@ export default function ExplorePage() {
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No upcoming events found.</p>
+              <p className="text-muted-foreground text-center py-4">No upcoming events found for this category.</p>
             )}
           </section>
 
@@ -217,7 +248,7 @@ export default function ExplorePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No events found near you.</p>
+              <p className="text-muted-foreground text-center py-4">No events found near you for this category.</p>
             )}
           </section>
         </div>
@@ -225,3 +256,5 @@ export default function ExplorePage() {
     </div>
   );
 }
+
+    
