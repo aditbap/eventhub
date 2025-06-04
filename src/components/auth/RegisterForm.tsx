@@ -16,8 +16,9 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { UpjLogo } from '@/components/icons/UpjLogo'; // Import UpjLogo
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -75,14 +76,18 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="relative flex flex-col w-full space-y-6 py-8"> {/* Added relative positioning */}
-      <div className="absolute top-4 left-0"> {/* Positioned back button */}
+    <div className="relative flex flex-col w-full space-y-6 py-8">
+      <div className="absolute top-4 left-0">
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
+
+      <div className="w-full flex justify-center mb-0 pt-2"> {/* Adjusted margin and padding */}
+        <UpjLogo className="h-16 w-auto" fill="hsl(var(--primary))" />
+      </div>
       
-      <h1 className="text-3xl font-headline font-bold self-start pt-10">Sign up</h1> {/* Added pt to make space for back button */}
+      <h1 className="text-3xl font-headline font-bold self-start pt-0">Sign up</h1> {/* Adjusted padding */}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4">
@@ -213,5 +218,3 @@ export function RegisterForm() {
     </div>
   );
 }
-
-    

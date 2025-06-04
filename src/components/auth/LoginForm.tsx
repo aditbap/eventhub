@@ -73,7 +73,9 @@ export function LoginForm() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full space-y-6">
-      <UpjLogo className="h-16 w-auto mb-4" fill="hsl(var(--primary))" />
+      <div className="w-full flex justify-center mb-4">
+        <UpjLogo className="h-16 w-auto" fill="hsl(var(--primary))" />
+      </div>
       
       <h1 className="text-3xl font-headline font-bold self-start">Sign in</h1>
 
@@ -114,6 +116,7 @@ export function LoginForm() {
                       size="icon" 
                       className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
