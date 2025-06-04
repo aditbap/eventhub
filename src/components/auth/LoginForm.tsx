@@ -87,7 +87,7 @@ export function LoginForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="aditdandava@email.com" {...field} className="pl-10" />
+                    <Input placeholder="yourmail@email.com" {...field} className="pl-10" />
                   </div>
                 </FormControl>
                 <FormMessage />
