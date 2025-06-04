@@ -42,7 +42,7 @@ export default function OnboardingPage() {
   if (isSplashVisible || authLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-primary p-6">
-        <UpjLogo className="h-24 w-auto animate-pulse" fill="white" />
+        <UpjLogo iconOnly className="h-24 w-auto animate-pulse" fill="white" />
       </div>
     );
   }
