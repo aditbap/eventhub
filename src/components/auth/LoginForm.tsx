@@ -39,10 +39,10 @@ const GoogleIcon = () => (
   </svg>
 );
 
-// Simple SVG for Facebook Icon
+// Updated Facebook Icon SVG
 const FacebookIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-    <path d="M12 2.04C6.5 2.04 2 6.53 2 12.06c0 5.52 4.5 10.02 10 10.02s10-4.5 10-10.02C22 6.53 17.5 2.04 12 2.04zm2.08 7.55h-1.4v-1.1c0-.3.13-.6.6-.6h.77V6.04H12.5c-1.5 0-2.42.9-2.42 2.47v1.6H9v1.9h1.08v5.6h2.16v-5.6H14l.23-1.9h-.15z"></path>
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+    <path d="M15.12 5.32H17.94V2.14C17.44 2.09 16.23 2 14.86 2C11.98 2 10.05 3.83 10.05 6.7V9.25H7.06V12.84H10.05V22H13.54V12.84H16.39L16.81 9.25H13.54V7.05C13.54 5.95 13.84 5.32 15.12 5.32Z"/>
   </svg>
 );
 
@@ -135,6 +135,7 @@ export function LoginForm() {
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       aria-label="Remember me"
+                      id="rememberMe"
                     />
                   </FormControl>
                   <Label htmlFor="rememberMe" className="font-normal text-sm">Remember Me</Label>
