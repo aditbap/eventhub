@@ -2,7 +2,7 @@
 
 import { BottomNavigationBar } from '@/components/layout/BottomNavigationBar';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter }_from 'next/navigation'; // Corrected import
+import { useRouter } from 'next/navigation'; // Corrected import
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
