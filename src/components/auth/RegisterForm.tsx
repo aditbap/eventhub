@@ -16,8 +16,8 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation'; // For back button (optional)
+import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react'; // Added ArrowLeft
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
@@ -75,16 +75,14 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="flex flex-col w-full space-y-6 py-8">
-      {/* Optional Back button based on image:
-      <div className="absolute top-4 left-4">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+    <div className="relative flex flex-col w-full space-y-6 py-8"> {/* Added relative positioning */}
+      <div className="absolute top-4 left-0"> {/* Positioned back button */}
+        <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
-      */}
       
-      <h1 className="text-3xl font-headline font-bold self-start">Sign up</h1>
+      <h1 className="text-3xl font-headline font-bold self-start pt-10">Sign up</h1> {/* Added pt to make space for back button */}
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4">
@@ -96,7 +94,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Full name" {...field} className="pl-10 h-12 rounded-md border-gray-300 focus:border-primary" />
+                    <Input placeholder="Full name" {...field} className="pl-10 h-12 rounded-md border-input focus:border-primary" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -111,7 +109,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-12 rounded-md border-gray-300 focus:border-primary" />
+                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-12 rounded-md border-input focus:border-primary" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -130,7 +128,7 @@ export function RegisterForm() {
                       type={showPassword ? 'text' : 'password'} 
                       placeholder="Your password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12 rounded-md border-gray-300 focus:border-primary"
+                      className="pl-10 pr-10 h-12 rounded-md border-input focus:border-primary"
                     />
                     <Button 
                       type="button" 
@@ -138,6 +136,7 @@ export function RegisterForm() {
                       size="icon" 
                       className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-primary"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
@@ -159,7 +158,7 @@ export function RegisterForm() {
                       type={showConfirmPassword ? 'text' : 'password'} 
                       placeholder="Confirm password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12 rounded-md border-gray-300 focus:border-primary"
+                      className="pl-10 pr-10 h-12 rounded-md border-input focus:border-primary"
                     />
                     <Button 
                       type="button" 
@@ -167,6 +166,7 @@ export function RegisterForm() {
                       size="icon" 
                       className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-primary"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                     >
                       {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
@@ -188,19 +188,19 @@ export function RegisterForm() {
 
       <div className="relative w-full flex items-center justify-center my-4">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-gray-300" />
+          <span className="w-full border-t border-border" />
         </div>
         <span className="relative bg-background px-2 text-sm text-muted-foreground">OR</span>
       </div>
 
       <div className="w-full space-y-3">
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-gray-300 hover:bg-gray-50">
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent">
           <GoogleIcon />
-          <span className="flex-grow text-center">Login with Google</span>
+          <span className="flex-grow text-center">Sign up with Google</span>
         </Button>
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-gray-300 hover:bg-gray-50">
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent">
           <FacebookIcon />
-          <span className="flex-grow text-center">Login with Facebook</span>
+          <span className="flex-grow text-center">Sign up with Facebook</span>
         </Button>
       </div>
 
@@ -213,3 +213,5 @@ export function RegisterForm() {
     </div>
   );
 }
+
+    
