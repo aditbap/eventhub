@@ -3,9 +3,17 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { auth } from '@/lib/firebase'; // Using mocked auth
+import { auth, db } from '@/lib/firebase'; // Using REAL Firebase
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  updateProfile,
+  type User as FirebaseUser // Import actual Firebase User type
+} from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
-import { User as FirebaseUser } from 'firebase/auth'; // Import actual Firebase User type if using real Firebase
 
 // Define a simpler User type for the context or use FirebaseUser
 export interface User {
@@ -31,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         setUser({
           uid: firebaseUser.uid,
@@ -47,15 +55,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = useCallback(async (email?: string, password?: string) => {
+    if (!email || !password) {
+      throw new Error("Email and password are required.");
+    }
     setLoading(true);
     try {
-      const { user: firebaseUser } = await auth.signInWithEmailAndPassword(email, password);
-      if (firebaseUser) {
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: firebaseUser.displayName });
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (userCredential.user) {
+        setUser({ uid: userCredential.user.uid, email: userCredential.user.email, displayName: userCredential.user.displayName });
         router.push('/explore');
       }
     } catch (error) {
-      // console.error("Login failed:", error); // Removed this line
+      console.error("Login failed:", error);
       throw error; // Re-throw to be caught by form
     } finally {
       setLoading(false);
@@ -63,11 +74,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [router]);
 
   const register = useCallback(async (name?: string, email?: string, password?: string) => {
+    if (!name || !email || !password) {
+      throw new Error("Name, email, and password are required.");
+    }
     setLoading(true);
     try {
-      const { user: firebaseUser } = await auth.createUserWithEmailAndPassword(email, password, name); // Mocked function takes name
-      if (firebaseUser) {
-        setUser({ uid: firebaseUser.uid, email: firebaseUser.email, displayName: name || firebaseUser.displayName });
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      if (userCredential.user) {
+        await updateProfile(userCredential.user, { displayName: name });
+        // Optionally, store additional user info in Firestore
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          displayName: name,
+          email: email,
+          createdAt: new Date(), // Or serverTimestamp()
+        });
+        setUser({ uid: userCredential.user.uid, email: userCredential.user.email, displayName: name });
         router.push('/explore');
       }
     } catch (error) {
@@ -81,7 +103,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(async () => {
     setLoading(true);
     try {
-      await auth.signOut();
+      await signOut(auth);
       setUser(null);
       router.push('/login');
     } catch (error) {
@@ -96,15 +118,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       '/login',
       '/register',
       '/reset-password',
-      '/new-password', // Add new-password page here
-      '/' // Onboarding/splash page
+      '/new-password', 
+      '/' 
     ];
 
     if (
       !loading &&
       !user &&
       !allowedUnauthenticatedPaths.some(p => pathname.startsWith(p)) &&
-      pathname !== '/' // Double check for root, though startsWith('/') handles it
+      pathname !== '/' 
     ) {
       router.push('/login');
     }

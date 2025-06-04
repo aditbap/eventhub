@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { TicketCard } from '@/components/profile/TicketCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOutIcon, MailIcon, UserIcon, Loader2, TicketIcon } from 'lucide-react';
-import { db } from '@/lib/firebase'; // mocked db
+import { db } from '@/lib/firebase'; // REAL db
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading } = useAuth();
@@ -19,32 +21,33 @@ export default function ProfilePage() {
       const fetchTickets = async () => {
         setLoadingTickets(true);
         try {
-          // Mock fetching tickets from Firestore (localStorage in mock)
-          const querySnapshot = await db.collection('userTickets').where('userId', '==', user.uid).get();
-          const userTickets: Ticket[] = [];
-          querySnapshot.docs.forEach(doc => {
-            // The mock stores tickets directly under userTickets/userId as an array
-            // This part needs adjustment based on how the mock db.collection().doc(userId).get() works
-            // Assuming the mock db.collection('userTickets').where('userId', '==', user.uid).get()
-            // returns docs which represent individual tickets for that user.
+          const ticketsRef = collection(db, 'userTickets');
+          const q = query(ticketsRef, where('userId', '==', user.uid));
+          const querySnapshot = await getDocs(q);
+          
+          const userTickets: Ticket[] = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            if (data) { // Check if data is not undefined
-                userTickets.push({
-                    id: doc.id, // Firestore doc ID
-                    eventId: data.eventId,
-                    userId: user.uid, // Set explicitly as the query ensures it
-                    eventName: data.eventName,
-                    eventDate: data.eventDate,
-                    eventLocation: data.eventLocation,
-                    // qrCodeUrl: data.qrCodeUrl, // if available
-                });
+            // Convert Firestore Timestamp to a more usable format if needed, e.g., ISO string or Date object
+            // For simplicity, we'll assume eventDate and purchaseDate are stored/retrieved as strings or handle conversion here.
+            // If purchaseDate is a Firestore Timestamp:
+            let purchaseDateStr = '';
+            if (data.purchaseDate && data.purchaseDate instanceof Timestamp) {
+              purchaseDateStr = data.purchaseDate.toDate().toISOString();
+            } else if (typeof data.purchaseDate === 'string') {
+              purchaseDateStr = data.purchaseDate;
             }
+
+            return {
+              id: doc.id,
+              userId: data.userId,
+              eventId: data.eventId,
+              eventName: data.eventName,
+              eventDate: data.eventDate, // Assuming this is already a string
+              eventLocation: data.eventLocation,
+              qrCodeUrl: data.qrCodeUrl, // if available
+              purchaseDate: purchaseDateStr, // Add this
+            } as Ticket;
           });
-          // The following is for the case where tickets are stored as an array in one doc per user
-          // const userTicketsDoc = await db.collection('userTickets').doc(user.uid).get();
-          // if (userTicketsDoc.exists()) {
-          //   setTickets(userTicketsDoc.data()?.tickets || []);
-          // }
           setTickets(userTickets);
 
         } catch (error) {
@@ -72,7 +75,7 @@ export default function ProfilePage() {
       <div className="bg-card shadow-lg rounded-lg p-6 mb-8">
         <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
           <Avatar className="h-24 w-24">
-            <AvatarImage src={`https://placehold.co/100x100.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" />
+            <AvatarImage src={`https://placehold.co/100x100.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar"/>
             <AvatarFallback>{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
           <div>

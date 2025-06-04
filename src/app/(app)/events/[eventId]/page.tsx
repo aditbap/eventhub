@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -7,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, MapPinIcon, UsersIcon, TicketIcon, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { db } from '@/lib/firebase'; // mocked db
+import { db } from '@/lib/firebase'; // REAL db
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -43,19 +45,17 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
     if (!user || !event) return;
     setIsGettingTicket(true);
     try {
-      // Simulate saving ticket to Firestore
-      const ticketData: Omit<Ticket, 'id' | 'userId' | 'qrCodeUrl'> = { // userId will be doc id
+      const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = { 
+        userId: user.uid,
         eventId: event.id,
         eventName: event.title,
         eventDate: event.date,
         eventLocation: event.location,
       };
-      // In a real app, you'd use Firestore addDoc or setDoc
-      // For this mock, we use the mocked db object which simulates set on userTickets/userId
-      // and stores in localStorage
-      await db.collection('userTickets').doc(user.uid).set({ 
-        ...ticketData, 
-        ticketId: `mock_ticket_${Date.now()}` // This is a bit hacky for mock
+      
+      await addDoc(collection(db, "userTickets"), {
+        ...ticketData,
+        purchaseDate: serverTimestamp() 
       });
 
       toast({
