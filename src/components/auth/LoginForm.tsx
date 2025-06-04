@@ -87,7 +87,7 @@ export function LoginForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="yourmail@email.com" {...field} className="pl-10" />
+                    <Input placeholder="Your email address" {...field} className="pl-10" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -132,10 +132,10 @@ export function LoginForm() {
                 <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                   <FormControl>
                     <Switch
+                      id="rememberMe"
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       aria-label="Remember me"
-                      id="rememberMe"
                     />
                   </FormControl>
                   <Label htmlFor="rememberMe" className="font-normal text-sm">Remember Me</Label>
