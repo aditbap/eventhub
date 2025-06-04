@@ -1,51 +1,49 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Music2, Utensils, Activity, Laptop, LucideIcon } from 'lucide-react'; // Added Laptop
+import type { Event } from '@/types';
 
-const categories = ['All', 'Music', 'Food', 'Sports', 'Other'];
+interface CategoryInfo {
+  name: Event['category'];
+  label: string;
+  icon: LucideIcon;
+  activeClassName: string;
+  inactiveClassName: string;
+}
 
-const categoryColors: Record<string, string> = {
-  Music: 'border-category-music text-category-music hover:bg-category-music/10',
-  Food: 'border-category-food text-category-food hover:bg-category-food/10',
-  Sports: 'border-category-sports text-category-sports hover:bg-category-sports/10',
-  Other: 'border-gray-500 text-gray-500 hover:bg-gray-500/10',
-  All: 'border-primary text-primary hover:bg-primary/10',
-};
-
-const activeCategoryColors: Record<string, string> = {
- Music: 'bg-category-music text-white',
- Food: 'bg-category-food text-white',
- Sports: 'bg-category-sports text-white',
- Other: 'bg-gray-500 text-white',
- All: 'bg-primary text-primary-foreground',
-};
-
+const categoriesData: CategoryInfo[] = [
+  { name: 'Music', label: 'Music', icon: Music2, activeClassName: 'bg-category-music text-white hover:bg-category-music/90', inactiveClassName: 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200' },
+  { name: 'Food', label: 'Food', icon: Utensils, activeClassName: 'bg-category-food text-white hover:bg-category-food/90', inactiveClassName: 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200' },
+  { name: 'Sports', label: 'Sports', icon: Activity, activeClassName: 'bg-category-sports text-white hover:bg-category-sports/90', inactiveClassName: 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200' },
+  { name: 'Tech', label: 'Tech', icon: Laptop, activeClassName: 'bg-category-tech text-white hover:bg-category-tech/90', inactiveClassName: 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200' },
+];
 
 interface CategoryFilterProps {
-  onSelectCategory: (category: string) => void;
-  currentCategory: string;
+  onSelectCategory: (category: Event['category']) => void;
+  currentCategory: Event['category'];
 }
 
 export function CategoryFilter({ onSelectCategory, currentCategory }: CategoryFilterProps) {
   return (
     <div className="py-4 overflow-x-auto">
       <div className="flex space-x-3">
-        {categories.map((category) => (
+        {categoriesData.map((category) => (
           <Button
-            key={category}
+            key={category.name}
             variant="outline"
-            size="sm"
-            onClick={() => onSelectCategory(category)}
+            size="default" // Adjusted size for better icon fitting
+            onClick={() => onSelectCategory(category.name)}
             className={cn(
-              "whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 ease-in-out",
-              currentCategory === category
-                ? activeCategoryColors[category] || activeCategoryColors['All']
-                : categoryColors[category] || categoryColors['All']
+              "whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ease-in-out flex items-center gap-2 h-12 min-w-[100px] justify-center shadow-sm",
+              currentCategory === category.name
+                ? category.activeClassName
+                : category.inactiveClassName
             )}
           >
-            {category}
+            <category.icon className="h-5 w-5" />
+            {category.label}
           </Button>
         ))}
       </div>

@@ -69,6 +69,7 @@ export default {
           music: '#F97068', // Coral Red
           food: '#4CAF50',  // Grass Green
           sports: '#FFA000', // Amber Orange
+          tech: '#3B82F6', // Blue-500
         }
       },
       borderRadius: {
