@@ -1,0 +1,119 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import type { Ticket } from '@/types';
+import { Button } from '@/components/ui/button';
+import { TicketCard } from '@/components/profile/TicketCard';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LogOutIcon, MailIcon, UserIcon, Loader2, TicketIcon } from 'lucide-react';
+import { db } from '@/lib/firebase'; // mocked db
+
+export default function ProfilePage() {
+  const { user, logout, loading: authLoading } = useAuth();
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      const fetchTickets = async () => {
+        setLoadingTickets(true);
+        try {
+          // Mock fetching tickets from Firestore (localStorage in mock)
+          const querySnapshot = await db.collection('userTickets').where('userId', '==', user.uid).get();
+          const userTickets: Ticket[] = [];
+          querySnapshot.docs.forEach(doc => {
+            // The mock stores tickets directly under userTickets/userId as an array
+            // This part needs adjustment based on how the mock db.collection().doc(userId).get() works
+            // Assuming the mock db.collection('userTickets').where('userId', '==', user.uid).get()
+            // returns docs which represent individual tickets for that user.
+            const data = doc.data();
+            if (data) { // Check if data is not undefined
+                userTickets.push({
+                    id: doc.id, // Firestore doc ID
+                    eventId: data.eventId,
+                    userId: user.uid, // Set explicitly as the query ensures it
+                    eventName: data.eventName,
+                    eventDate: data.eventDate,
+                    eventLocation: data.eventLocation,
+                    // qrCodeUrl: data.qrCodeUrl, // if available
+                });
+            }
+          });
+          // The following is for the case where tickets are stored as an array in one doc per user
+          // const userTicketsDoc = await db.collection('userTickets').doc(user.uid).get();
+          // if (userTicketsDoc.exists()) {
+          //   setTickets(userTicketsDoc.data()?.tickets || []);
+          // }
+          setTickets(userTickets);
+
+        } catch (error) {
+          console.error('Error fetching tickets:', error);
+        } finally {
+          setLoadingTickets(false);
+        }
+      };
+      fetchTickets();
+    } else {
+      setLoadingTickets(false);
+    }
+  }, [user]);
+
+  if (authLoading || !user) {
+    return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <header className="mb-8 text-center md:text-left">
+        <h1 className="text-3xl font-headline font-bold text-primary">My Profile</h1>
+      </header>
+
+      <div className="bg-card shadow-lg rounded-lg p-6 mb-8">
+        <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-6">
+          <Avatar className="h-24 w-24">
+            <AvatarImage src={`https://placehold.co/100x100.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" />
+            <AvatarFallback>{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
+          </Avatar>
+          <div>
+            <h2 className="text-2xl font-semibold font-headline">{user.displayName || 'User'}</h2>
+            {user.email && (
+              <div className="flex items-center text-muted-foreground mt-1">
+                <MailIcon className="h-4 w-4 mr-2" />
+                {user.email}
+              </div>
+            )}
+            <div className="flex items-center text-muted-foreground mt-1">
+                <UserIcon className="h-4 w-4 mr-2" />
+                User ID: {user.uid.substring(0,10)}...
+            </div>
+          </div>
+          <Button onClick={logout} variant="outline" className="md:ml-auto mt-4 md:mt-0">
+            <LogOutIcon className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
+      </div>
+
+      <section>
+        <h2 className="text-2xl font-headline font-semibold mb-6 flex items-center">
+            <TicketIcon className="h-6 w-6 mr-2 text-primary"/>
+            My Tickets
+        </h2>
+        {loadingTickets ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : tickets.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {tickets.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-center py-8">You have no tickets yet. Explore events and get yours!</p>
+        )}
+      </section>
+    </div>
+  );
+}
