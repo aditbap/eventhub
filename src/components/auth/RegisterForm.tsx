@@ -76,18 +76,18 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="relative flex flex-col w-full space-y-6 py-8">
+    <div className="relative flex flex-col w-full space-y-5 pt-6 pb-8">
       <div className="absolute top-4 left-0">
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
 
-      <div className="w-full flex justify-center mb-0 pt-2"> {/* Adjusted margin and padding */}
+      <div className="w-full flex justify-center mb-0 pt-2">
         <UpjLogo className="h-16 w-auto" fill="hsl(var(--primary))" />
       </div>
       
-      <h1 className="text-3xl font-headline font-bold self-start pt-0">Sign up</h1> {/* Adjusted padding */}
+      <h1 className="text-3xl font-headline font-bold self-start pt-0">Sign up</h1>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4">
