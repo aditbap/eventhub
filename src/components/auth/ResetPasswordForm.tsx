@@ -90,7 +90,7 @@ export function ResetPasswordForm() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input 
                       type="email"
-                      placeholder="davaandadit@email.com" 
+                      placeholder="Your email address" 
                       {...field} 
                       className="pl-10 h-12 rounded-md border-input focus:border-primary" 
                     />
