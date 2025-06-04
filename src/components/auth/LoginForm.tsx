@@ -41,10 +41,10 @@ const GoogleIcon = () => (
 
 // Updated Facebook Icon SVG
 const FacebookIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-    <path d="M15.12 5.32H17.94V2.14C17.44 2.09 16.23 2 14.86 2C11.98 2 10.05 3.83 10.05 6.7V9.25H7.06V12.84H10.05V22H13.54V12.84H16.39L16.81 9.25H13.54V7.05C13.54 5.95 13.84 5.32 15.12 5.32Z"/>
-  </svg>
-);
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
+      <path d="M9.19795 21.5H13.198V13.4901H16.8021L17.198 9.50977H13.198V7.5C13.198 6.94772 13.6457 6.5 14.198 6.5H17.198V2.5H14.198C11.4365 2.5 9.19795 4.73858 9.19795 7.5V9.50977H7.19795L6.80206 13.4901H9.19795V21.5Z" />
+    </svg>
+  );
 
 
 export function LoginForm() {
@@ -145,7 +145,7 @@ export function LoginForm() {
                 </FormItem>
               )}
             />
-            <Link href="#" className="text-sm font-medium text-primary hover:underline">
+            <Link href="/reset-password" className="text-sm font-medium text-primary hover:underline">
               Forgot Password?
             </Link>
           </div>
