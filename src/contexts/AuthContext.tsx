@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -54,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         router.push('/explore');
       }
     } catch (error) {
-      console.error("Login failed:", error);
+      // console.error("Login failed:", error); // Removed this line
       throw error; // Re-throw to be caught by form
     } finally {
       setLoading(false);
