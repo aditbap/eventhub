@@ -1,96 +1,161 @@
+
 // This is a mock Firebase setup. In a real app, you'd initialize Firebase here.
-// For example:
-// import { initializeApp, getApps, getApp } from 'firebase/app';
-// import { getAuth } from 'firebase/auth';
-// import { getFirestore } from 'firebase/firestore';
 
-// const firebaseConfig = {
-//   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-//   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-//   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-//   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-//   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-//   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-// };
+// Key for storing all registered users in localStorage
+const MOCK_REGISTERED_USERS_KEY = 'mockRegisteredUsers';
 
-// const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-// const auth = getAuth(app);
-// const db = getFirestore(app);
+// Helper function to get registered users from localStorage
+const getRegisteredUsers = (): any[] => {
+  if (typeof window === 'undefined') return [];
+  const users = localStorage.getItem(MOCK_REGISTERED_USERS_KEY);
+  return users ? JSON.parse(users) : [];
+};
 
-// export { app, auth, db };
+// Helper function to save registered users to localStorage
+const saveRegisteredUsers = (users: any[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(MOCK_REGISTERED_USERS_KEY, JSON.stringify(users));
+};
 
-
-// Mock implementations
 export const auth = {
-  // Simulate Firebase Auth onAuthStateChanged
   onAuthStateChanged: (callback: (user: any) => void) => {
-    // Simulate checking for a stored user (e.g., in localStorage)
     setTimeout(() => {
-      const storedUser = localStorage.getItem('mockUser');
-      if (storedUser) {
-        callback(JSON.parse(storedUser));
+      if (typeof window !== 'undefined') {
+        const storedUser = localStorage.getItem('mockUser');
+        if (storedUser) {
+          callback(JSON.parse(storedUser));
+        } else {
+          callback(null);
+        }
       } else {
         callback(null);
       }
-    }, 500); // Simulate async behavior
-    // Return a mock unsubscribe function
+    }, 500);
     return () => {};
   },
-  // Simulate signInWithEmailAndPassword
+
   signInWithEmailAndPassword: async (email?: string, password?: string) => {
-    if (email === 'user@example.com' && password === 'password123') {
-      const user = { uid: 'mockUid123', email: 'user@example.com', displayName: 'Test User' };
-      localStorage.setItem('mockUser', JSON.stringify(user));
-      return { user };
+    if (typeof window === 'undefined') {
+      throw new Error('Authentication operations can only be performed in the browser.');
+    }
+    const registeredUsers = getRegisteredUsers();
+    const foundUser = registeredUsers.find(
+      (u: any) => u.email === email && u.password === password // Plain text password check for mock
+    );
+
+    if (foundUser) {
+      // Don't store password in the "active session" mockUser
+      const sessionUser = { uid: foundUser.uid, email: foundUser.email, displayName: foundUser.displayName };
+      localStorage.setItem('mockUser', JSON.stringify(sessionUser));
+      return { user: sessionUser };
     }
     throw new Error('Invalid credentials');
   },
-  // Simulate createUserWithEmailAndPassword
+
   createUserWithEmailAndPassword: async (email?: string, password?: string, name?: string) => {
-    const user = { uid: `mockUid${Date.now()}`, email, displayName: name || 'New User' };
-    localStorage.setItem('mockUser', JSON.stringify(user));
-    return { user };
+    if (typeof window === 'undefined') {
+      throw new Error('Authentication operations can only be performed in the browser.');
+    }
+    if (!email || !password) {
+        throw new Error('Email and password are required for registration.');
+    }
+    const registeredUsers = getRegisteredUsers();
+    if (registeredUsers.some((u: any) => u.email === email)) {
+      throw new Error('auth/email-already-in-use'); // More Firebase-like error
+    }
+
+    const newUser = {
+      uid: `mockUid${Date.now()}`,
+      email,
+      password, // Store password for mock checking, DO NOT do this in a real app
+      displayName: name || 'New User',
+    };
+    registeredUsers.push(newUser);
+    saveRegisteredUsers(registeredUsers);
+
+    // Simulate auto-login after registration
+    const sessionUser = { uid: newUser.uid, email: newUser.email, displayName: newUser.displayName };
+    localStorage.setItem('mockUser', JSON.stringify(sessionUser));
+    return { user: sessionUser };
   },
-  // Simulate signOut
+
   signOut: async () => {
+    if (typeof window === 'undefined') return;
     localStorage.removeItem('mockUser');
   },
-  // Simulate currentUser
+
   get currentUser() {
-    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('mockUser') : null;
+    if (typeof window === 'undefined') return null;
+    const storedUser = localStorage.getItem('mockUser');
     return storedUser ? JSON.parse(storedUser) : null;
   }
 };
 
 export const db = {
-  // Mock Firestore collection and doc operations
   collection: (path: string) => ({
     doc: (id?: string) => ({
       set: async (data: any) => {
         console.log(`Mock Firestore: Writing to ${path}/${id || '(auto-id)'}`, data);
-        // Simulate saving ticket
-        if (path === 'userTickets' && id) {
-          const tickets = JSON.parse(localStorage.getItem(`tickets_${id}`) || '[]');
-          tickets.push({...data, id: `ticket_${Date.now()}` });
-          localStorage.setItem(`tickets_${id}`, JSON.stringify(tickets));
+        if (typeof window !== 'undefined') {
+            if (path === 'userTickets' && id) {
+                // Attempt to get current user for ticket association
+                const currentUser = auth.currentUser;
+                if (currentUser && currentUser.uid === id) { // Ensure ticket is for current logged in user
+                    const ticketsKey = `tickets_${currentUser.uid}`;
+                    const tickets = JSON.parse(localStorage.getItem(ticketsKey) || '[]');
+                    // Add ticket with a unique ID, ensuring it's linked to the user
+                    const newTicket = { ...data, id: `ticket_${Date.now()}`, userId: currentUser.uid };
+                    tickets.push(newTicket);
+                    localStorage.setItem(ticketsKey, JSON.stringify(tickets));
+                } else {
+                    console.warn("Mock DB: Attempted to set ticket for non-matching or non-logged-in user.");
+                }
+            } else if (path === 'users' && id) {
+              // Example for storing user profile data, can be expanded
+              localStorage.setItem(`user_profile_${id}`, JSON.stringify(data));
+            }
         }
         return Promise.resolve();
       },
       get: async () => {
-         if (path === 'userTickets' && id) {
-          const ticketsData = localStorage.getItem(`tickets_${id}`);
-          const tickets = ticketsData ? JSON.parse(ticketsData) : [];
-          return Promise.resolve({ exists: () => true, data: () => ({ tickets }) });
-         }
-         return Promise.resolve({ exists: () => false, data: () => undefined });
+        if (typeof window !== 'undefined') {
+            if (path === 'userTickets' && id) {
+                const ticketsKey = `tickets_${id}`; // id here is userId
+                const ticketsData = localStorage.getItem(ticketsKey);
+                const tickets = ticketsData ? JSON.parse(ticketsData) : [];
+                // For get(), we might return the whole user document if that's how tickets are stored (e.g. user doc has a tickets array)
+                // Or, if tickets are queried by userId, this structure needs to align with the query in ProfilePage
+                // For simplicity here, assuming get by user ID will return structure ProfilePage expects
+                // The ProfilePage query is currently db.collection('userTickets').where('userId', '==', user.uid).get();
+                // So this .doc(id).get() is not directly hit by ProfilePage for tickets.
+                // Let's assume this would fetch a user's doc that might contain tickets array (not current model)
+                // For now, let this be a placeholder, as ticket fetching is done via .where().get()
+                return Promise.resolve({ exists: () => false, data: () => undefined }); // Simplified
+            } else if (path === 'users' && id) {
+                const profileData = localStorage.getItem(`user_profile_${id}`);
+                if (profileData) {
+                    return Promise.resolve({ exists: () => true, data: () => JSON.parse(profileData) });
+                }
+            }
+        }
+        return Promise.resolve({ exists: () => false, data: () => undefined });
       }
     }),
-    where: (field: string, op: string, value: any) => ({ // Basic mock for queries
+    where: (field: string, op: string, value: any) => ({
         get: async () => {
-            if (path === 'userTickets' && field === 'userId' && op === '==') {
-                const ticketsData = localStorage.getItem(`tickets_${value}`);
-                const tickets = ticketsData ? JSON.parse(ticketsData) : [];
-                return Promise.resolve({ docs: tickets.map((ticket: any) => ({ id: ticket.id, data: () => ticket })) });
+            if (typeof window !== 'undefined') {
+                if (path === 'userTickets' && field === 'userId' && op === '==') {
+                    const ticketsKey = `tickets_${value}`; // value here is userId
+                    const ticketsData = localStorage.getItem(ticketsKey);
+                    const ticketsArray = ticketsData ? JSON.parse(ticketsData) : [];
+                    // Firestore's get() on a query returns an object with a docs array
+                    return Promise.resolve({ 
+                        docs: ticketsArray.map((ticket: any) => ({ 
+                            id: ticket.id, 
+                            data: () => ticket 
+                        })) 
+                    });
+                }
             }
             return Promise.resolve({ docs: [] });
         }
