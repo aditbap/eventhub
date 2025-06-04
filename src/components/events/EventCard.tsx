@@ -1,11 +1,12 @@
+
 'use client';
 
 import type { Event } from '@/types';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card'; // Removed CardFooter, CardHeader, CardTitle for custom layout
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPinIcon, Bookmark, CalendarDays } from 'lucide-react'; // Using Bookmark for filled version
+import { MapPinIcon, Bookmark, CalendarDays, DollarSign } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -45,8 +46,11 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
     };
     const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
     const weekday = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-    return `${day}${suffix(parseInt(day))} ${month} - ${weekday} ${event.time ? `- ${event.time}` : ''}`;
+    const time = event.time ? ` - ${event.time}` : '';
+    return `${day}${suffix(parseInt(day))} ${month} - ${weekday}${time}`;
   };
+
+  const priceDisplay = event.price === 0 ? 'Free' : event.price ? `$${event.price}` : 'N/A';
 
 
   if (variant === 'upcoming') {
@@ -54,7 +58,7 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
     return (
       <Link href={`/events/${event.id}`} className="block h-full">
         <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col h-full rounded-xl">
-          <div className="relative aspect-[4/3] w-full"> {/* Adjusted aspect ratio */}
+          <div className="relative aspect-[4/3] w-full">
             <Image
               src={event.imageUrl}
               alt={event.title}
@@ -89,13 +93,19 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
                       </Avatar>
                     ))}
                   </div>
-                  {event.attendanceCount && <span className="text-xs text-red-500 font-medium">+{event.attendanceCount - (event.attendees?.slice(0,3).length || 0)} Going</span>}
+                  {event.attendanceCount && <span className="text-xs text-red-500 font-medium">+{Math.max(0, event.attendanceCount - (event.attendees?.slice(0,3).length || 0))} Going</span>}
                 </div>
               )}
             </div>
-            <div className="text-xs text-muted-foreground flex items-center">
-              <MapPinIcon className="h-3.5 w-3.5 mr-1 shrink-0" />
-              <span>{event.location}</span>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground flex items-center">
+                <MapPinIcon className="h-3.5 w-3.5 mr-1 shrink-0 text-primary" />
+                <span>{event.location}</span>
+              </div>
+              <div className="text-xs text-muted-foreground flex items-center">
+                <DollarSign className="h-3.5 w-3.5 mr-1 shrink-0 text-primary" />
+                <span>{priceDisplay}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -106,7 +116,7 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
   if (variant === 'nearYou') {
     return (
       <Link href={`/events/${event.id}`} className="block w-full">
-        <Card className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 h-full rounded-xl p-3 items-center">
+        <Card className="flex overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 h-full rounded-xl p-3 items-center bg-card">
           <div className="relative w-20 h-20 mr-4 flex-shrink-0">
             <Image
               src={event.imageUrl}
@@ -120,10 +130,14 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
           <div className="flex-grow min-w-0">
             <p className="text-xs font-semibold text-primary mb-0.5 truncate">{formatDate(event.date, 'short')}</p>
             <h4 className="text-sm font-headline font-medium text-foreground mb-1 line-clamp-2">{event.title}</h4>
-            <div className="text-xs text-muted-foreground flex items-center">
+            <div className="flex items-center text-xs text-muted-foreground mb-1">
               <MapPinIcon className="h-3.5 w-3.5 mr-1 shrink-0" />
               <span className="truncate">{event.location}</span>
             </div>
+            <div className="flex items-center text-xs text-muted-foreground">
+                <DollarSign className="h-3.5 w-3.5 mr-1 shrink-0" />
+                <span>{priceDisplay}</span>
+              </div>
           </div>
           <Button 
             variant="ghost" 
@@ -161,3 +175,4 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
     </Link>
   );
 }
+

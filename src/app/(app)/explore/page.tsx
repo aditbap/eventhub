@@ -17,7 +17,7 @@ const MOCK_EVENTS: Event[] = [
     id: '1', 
     title: 'UPJ Concert', 
     description: 'An amazing summer music festival.', 
-    date: '2024-07-15', 
+    date: '2024-08-15', // Future date
     time: '18:00', 
     location: 'UPJ Bintaro', 
     category: 'Music', 
@@ -35,7 +35,7 @@ const MOCK_EVENTS: Event[] = [
     id: '2', 
     title: 'Forkalympics', 
     description: 'Taste the best food trucks in town.', 
-    date: '2024-08-18', 
+    date: '2024-09-18', // Future date
     time: '12:00', 
     location: 'UPJ Bintaro', 
     category: 'Sports', 
@@ -53,8 +53,8 @@ const MOCK_EVENTS: Event[] = [
     id: '3', 
     title: 'Malam Minggu Concert', 
     description: 'Run for a cause!', 
-    date: '2024-06-01', 
-    time: '14:00', 
+    date: '2024-08-01', // Future date
+    time: '19:00', 
     location: 'Bintaro Xchange', 
     category: 'Music', 
     imageUrl: 'https://placehold.co/100x100.png', 
@@ -66,7 +66,7 @@ const MOCK_EVENTS: Event[] = [
     id: '4', 
     title: 'AI Showtime', 
     description: 'Latest in tech innovations.', 
-    date: '2024-05-01', 
+    date: '2024-10-01', // Future date
     time: '10:00', 
     location: 'Online', 
     category: 'Tech', 
@@ -75,7 +75,7 @@ const MOCK_EVENTS: Event[] = [
     attendanceCount: 300, 
     price: 100 
   },
-  { id: '5', title: 'Local Indie Night', description: 'Discover local indie bands.', date: '2024-07-28', time: '20:00', location: 'Coffee Town Bintaro', category: 'Music', imageUrl: 'https://placehold.co/300x200.png', imageHint: 'indie band', attendanceCount: 150, price: 15,
+  { id: '5', title: 'Local Indie Night', description: 'Discover local indie bands.', date: '2024-08-28', time: '20:00', location: 'Coffee Town Bintaro', category: 'Music', imageUrl: 'https://placehold.co/300x200.png', imageHint: 'indie band', attendanceCount: 150, price: 15,
     attendees: [
       { id: 'c1', avatarUrl: 'https://placehold.co/32x32.png?text=G', name: 'User G' },
       { id: 'c2', avatarUrl: 'https://placehold.co/32x32.png?text=H', name: 'User H' },
@@ -118,6 +118,67 @@ const MOCK_EVENTS: Event[] = [
     attendanceCount: 75, 
     price: 0 
   },
+  {
+    id: '9',
+    title: 'Jazz Night Serenade',
+    description: 'Relax with smooth jazz tunes under the stars.',
+    date: '2024-11-12',
+    time: '19:30',
+    location: 'Rooftop Lounge Bintaro',
+    category: 'Music',
+    imageUrl: 'https://placehold.co/300x200.png',
+    imageHint: 'jazz music',
+    attendanceCount: 120,
+    price: 75,
+    attendees: [
+        { id: 'f1', avatarUrl: 'https://placehold.co/32x32.png?text=N', name: 'User N' },
+        { id: 'f2', avatarUrl: 'https://placehold.co/32x32.png?text=O', name: 'User O' },
+    ]
+  },
+  {
+    id: '10',
+    title: 'Street Food Fiesta',
+    description: 'A vibrant gathering of street food vendors.',
+    date: '2024-10-25',
+    time: '16:00',
+    location: 'Bintaro Town Square',
+    category: 'Food',
+    imageUrl: 'https://placehold.co/300x200.png',
+    imageHint: 'street food',
+    attendanceCount: 300,
+    price: 0,
+    attendees: [
+        { id: 'g1', avatarUrl: 'https://placehold.co/32x32.png?text=P', name: 'User P' },
+        { id: 'g2', avatarUrl: 'https://placehold.co/32x32.png?text=Q', name: 'User Q' },
+        { id: 'g3', avatarUrl: 'https://placehold.co/32x32.png?text=R', name: 'User R' },
+    ]
+  },
+  {
+    id: '11',
+    title: 'Morning Run Club',
+    description: 'Join us for a refreshing morning run.',
+    date: '2024-08-20',
+    time: '06:00',
+    location: 'UPJ jogging track',
+    category: 'Sports',
+    imageUrl: 'https://placehold.co/100x100.png',
+    imageHint: 'running group',
+    attendanceCount: 45,
+    price: 0
+  },
+  {
+    id: '12',
+    title: 'Digital Art Workshop',
+    description: 'Unleash your creativity with digital tools.',
+    date: '2024-11-05',
+    time: '13:00',
+    location: 'Creative Lab UPJ',
+    category: 'Tech',
+    imageUrl: 'https://placehold.co/100x100.png',
+    imageHint: 'digital art',
+    attendanceCount: 60,
+    price: 20
+  }
 ];
 
 export default function ExplorePage() {
@@ -125,7 +186,7 @@ export default function ExplorePage() {
   const [currentCategory, setCurrentCategory] = useState<Event['category']>('Music'); // Default to Music
   const [location, setLocation] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>(MOCK_EVENTS);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     setLoadingLocation(true);
@@ -152,9 +213,13 @@ export default function ExplorePage() {
 
   useEffect(() => {
     let events = MOCK_EVENTS;
-    if (currentCategory !== 'All') { // 'All' is not in the new design, but keeping logic flexible
+    // Ensure currentCategory is one of the valid categories or handle 'All' if needed
+    const validCategories: Event['category'][] = ['Music', 'Food', 'Sports', 'Tech', 'Other'];
+    if (validCategories.includes(currentCategory)) {
       events = events.filter(event => event.category === currentCategory);
     }
+    // else if currentCategory === 'All', no category filter is applied.
+
     if (searchQuery) {
       events = events.filter(event =>
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -164,8 +229,15 @@ export default function ExplorePage() {
     setFilteredEvents(events);
   }, [searchQuery, currentCategory]);
 
-  const upcomingEvents = filteredEvents.filter(e => new Date(e.date) >= new Date() && e.attendees).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
-  const nearYouEvents = filteredEvents.filter(e => !e.attendees && new Date(e.date) >= new Date()).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5); // Also ensure near you events are upcoming
+  const upcomingEvents = filteredEvents
+    .filter(e => new Date(e.date) >= new Date() && e.attendees && e.attendees.length > 0)
+    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 5); // Limit to 5 or more as needed
+
+  const nearYouEvents = filteredEvents
+    .filter(e => new Date(e.date) >= new Date() && (!e.attendees || e.attendees.length === 0))
+    .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 5); // Limit to 5 or more as needed
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -180,6 +252,7 @@ export default function ExplorePage() {
               <Loader2 className="h-4 w-4 animate-spin mx-auto" />
             ) : (
               <div className="flex items-center font-semibold">
+                <LocationIcon className="h-4 w-4 mr-1" />
                 {location || 'Bintaro'} <ChevronDown className="h-4 w-4 ml-1" />
               </div>
             )}
@@ -195,7 +268,7 @@ export default function ExplorePage() {
             <SearchIcon className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
             <Input
               type="search"
-              placeholder="Search events"
+              placeholder="Search events, food, sports..."
               className="flex-grow border-none focus:ring-0 pl-1 text-sm shadow-none bg-transparent h-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -207,12 +280,12 @@ export default function ExplorePage() {
         </div>
       </header>
 
-      <main className="flex-grow pt-14 pb-4"> {/* pt-14 to account for search bar overlap */}
-        <div className="container mx-auto">
+      <main className="flex-grow pt-16 pb-20"> {/* Increased pt for search bar, increased pb for nav */}
+        <div className="container mx-auto px-4"> {/* Added px-4 for consistent container padding */}
           <CategoryFilter currentCategory={currentCategory} onSelectCategory={(cat) => setCurrentCategory(cat as Event['category'])} />
           
-          <section className="mb-6">
-            <div className="flex justify-between items-center mb-3">
+          <section className="mb-8"> {/* Increased margin bottom */}
+            <div className="flex justify-between items-center mb-4"> {/* Increased margin bottom */}
               <h2 className="text-xl font-headline font-semibold">Upcoming Events</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />
@@ -222,7 +295,7 @@ export default function ExplorePage() {
               <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1"> {/* Negative margin for edge cards */}
                 <div className="flex space-x-4 pb-4">
                   {upcomingEvents.map((event) => (
-                    <div key={event.id} className="w-[280px] h-full flex-shrink-0">
+                    <div key={event.id} className="w-[280px] h-full flex-shrink-0"> {/* Adjusted width if needed */}
                         <EventCard event={event} variant="upcoming" />
                     </div>
                   ))}
@@ -235,7 +308,7 @@ export default function ExplorePage() {
           </section>
 
           <section>
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between items-center mb-4"> {/* Increased margin bottom */}
               <h2 className="text-xl font-headline font-semibold">Near You</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />
@@ -256,5 +329,3 @@ export default function ExplorePage() {
     </div>
   );
 }
-
-    
