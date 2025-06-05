@@ -22,7 +22,7 @@ import { UpjLogo } from '@/components/icons/UpjLogo';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  email: z.string().email({ message: 'Invalid email address.' }), // Zod handles basic email format validation
+  email: z.string().email({ message: 'Invalid email address.' }), 
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' })
 }).refine(data => data.password === data.confirmPassword, {
@@ -65,19 +65,20 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setError(null);
-    try {
-      await register(values.name, values.email, values.password);
-    } catch (err: any) {
+    const result = await register(values.name, values.email, values.password);
+
+    if (!result.success) {
+      const err = result.error;
       if (err.code === 'auth/email-already-in-use') {
         setError("Email already in use.");
-      } else if (err.code === 'auth/invalid-email') {
-        setError("Invalid email address format."); // Should be caught by Zod, but as a fallback
-      }
-      else {
+      } else if (err.code === 'auth/invalid-email') { // Firebase's definition of invalid-email
+        setError("Invalid email address format.");
+      } else {
         setError(err.message || 'Failed to register. Please try again.');
       }
-      console.error("Registration attempt failed:", err.code, err.message, err);
+      console.error("Registration attempt failed (handled in form): Code:", err.code, "Message:", err.message);
     }
+    // If successful, AuthContext handles navigation.
   }
 
   const handleGoogleSignUp = async () => {
@@ -118,7 +119,7 @@ export function RegisterForm() {
   };
 
   return (
-    <div className="relative flex flex-col w-full space-y-6">
+    <div className="relative flex flex-col items-center justify-center w-full space-y-6">
       <div className="absolute top-0 left-[-8px] sm:left-0"> 
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />

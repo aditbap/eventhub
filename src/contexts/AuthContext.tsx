@@ -28,7 +28,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
 }
@@ -82,9 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router]);
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
+  const register = useCallback(async (name: string, email: string, password: string): Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }> => {
     if (!name || !email || !password) {
-      throw new Error("Name, email, and password are required.");
+      return { success: false, error: { message: "Name, email, and password are required." } };
     }
     setLoading(true);
     try {
@@ -99,17 +99,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL || null,
           createdAt: serverTimestamp(), 
         });
-        setUser({ 
+        const loggedInUser = { 
           uid: userCredential.user.uid, 
           email: userCredential.user.email, 
           displayName: name,
           photoURL: userCredential.user.photoURL
-        });
-        router.push('/explore');
+        };
+        setUser(loggedInUser);
+        router.push('/explore'); // Navigation as a side effect
+        return { success: true, user: loggedInUser };
+      } else {
+        // This case should ideally not be reached if createUserWithEmailAndPassword resolves.
+        return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
       }
-    } catch (error) {
-      console.error("Registration failed:", error);
-      throw error;
+    } catch (err: any) {
+      console.error("Registration failed in AuthContext:", err);
+      return { success: false, error: { code: err.code, message: err.message } };
     } finally {
       setLoading(false);
     }
@@ -150,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error.message) {
         console.error("Error message:", error.message);
       }
-      throw error; // Re-throw the error to be caught by the calling form
+      throw error; 
     } finally {
       setLoading(false);
     }
