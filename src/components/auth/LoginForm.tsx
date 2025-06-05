@@ -69,7 +69,7 @@ export function LoginForm() {
       } else {
         setError(err.message || 'Failed to login. Please check your credentials.');
       }
-      console.error("Login attempt failed:", err);
+      console.error("Login attempt failed:", err.code, err.message, err);
     }
   }
 
@@ -78,8 +78,25 @@ export function LoginForm() {
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err.message || 'Failed to login with Google. Please try again.');
-      console.error("Google login failed:", err);
+      let userMessage = 'Failed to login with Google. Please try again.';
+      if (err.code) {
+        switch (err.code) {
+          case 'auth/popup-closed-by-user':
+            userMessage = 'Google Sign-In was cancelled. Please try again.';
+            break;
+          case 'auth/popup-blocked':
+            userMessage = 'Google Sign-In popup was blocked by your browser. Please enable popups and try again.';
+            break;
+          case 'auth/cancelled-popup-request':
+             userMessage = 'Google Sign-In was cancelled. Please ensure popups are not blocked and try again.';
+            break;
+          case 'auth/unauthorized-domain':
+            userMessage = 'This domain is not authorized for Google Sign-In. Please contact support.';
+            break;
+        }
+      }
+      setError(userMessage);
+      console.error("Google login failed:", err.code, err.message, err);
     }
   };
 

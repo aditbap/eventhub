@@ -10,28 +10,27 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   updateProfile,
-  GoogleAuthProvider, // Added
-  signInWithPopup,    // Added
-  getAdditionalUserInfo, // Added
+  GoogleAuthProvider,
+  signInWithPopup,
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Added getDoc, serverTimestamp
+import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  photoURL?: string | null; // Added for Google Sign-In
+  photoURL?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>; // Made params non-optional
-  register: (name: string, email: string, password: string) => Promise<void>; // Made params non-optional
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>; // Added
+  loginWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,8 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => { // Updated signature
-    if (!email || !password) { // Kept for safety, though type system should catch it
+  const login = useCallback(async (email: string, password: string) => {
+    if (!email || !password) {
       throw new Error("Email and password are required.");
     }
     setLoading(true);
@@ -83,8 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router]);
 
-  const register = useCallback(async (name: string, email: string, password: string) => { // Updated signature
-    if (!name || !email || !password) { // Kept for safety
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    if (!name || !email || !password) {
       throw new Error("Name, email, and password are required.");
     }
     setLoading(true);
@@ -123,11 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
       if (firebaseUser) {
-        // Check if user is new or existing to decide on Firestore write
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
 
-        if (!userDoc.exists()) { // New user via Google
+        if (!userDoc.exists()) {
           await setDoc(userDocRef, {
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName,
@@ -144,10 +142,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         router.push('/explore');
       }
-    } catch (error) {
-      console.error("Google login failed:", error);
-      // Handle specific errors like 'auth/popup-closed-by-user' if needed
-      throw error;
+    } catch (error: any) {
+      console.error("Google login failed. Raw error object:", error);
+      if (error.code) {
+        console.error("Error code:", error.code);
+      }
+      if (error.message) {
+        console.error("Error message:", error.message);
+      }
+      throw error; // Re-throw the error to be caught by the calling form
     } finally {
       setLoading(false);
     }

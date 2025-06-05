@@ -75,10 +75,27 @@ export function RegisterForm() {
   const handleGoogleSignUp = async () => {
     setError(null);
     try {
-      await loginWithGoogle(); // Reuses loginWithGoogle which handles new user creation in Firestore
+      await loginWithGoogle(); 
     } catch (err: any) {
-      setError(err.message || 'Failed to sign up with Google. Please try again.');
-      console.error("Google sign up failed:", err);
+      let userMessage = 'Failed to sign up with Google. Please try again.';
+       if (err.code) {
+        switch (err.code) {
+          case 'auth/popup-closed-by-user':
+            userMessage = 'Google Sign-Up was cancelled. Please try again.';
+            break;
+          case 'auth/popup-blocked':
+            userMessage = 'Google Sign-Up popup was blocked by your browser. Please enable popups and try again.';
+            break;
+          case 'auth/cancelled-popup-request':
+             userMessage = 'Google Sign-Up was cancelled. Please ensure popups are not blocked and try again.';
+            break;
+          case 'auth/unauthorized-domain':
+            userMessage = 'This domain is not authorized for Google Sign-Up. Please contact support.';
+            break;
+        }
+      }
+      setError(userMessage);
+      console.error("Google sign up failed:", err.code, err.message, err);
     }
   };
 
