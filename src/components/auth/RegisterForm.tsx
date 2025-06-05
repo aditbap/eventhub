@@ -76,21 +76,21 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="relative flex flex-col w-full space-y-4 pt-1 pb-3">
-      <div className="absolute top-1 left-0">
+    <div className="relative flex flex-col w-full space-y-4">
+      <div className="absolute top-0 left-[-8px] sm:left-0"> {/* Adjusted for better positioning with layout padding */}
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
 
-      <div className="w-full flex justify-center mb-0">
+      <div className="w-full flex justify-center mb-2"> {/* Reduced bottom margin */}
         <UpjLogo className="h-12 w-auto" fill="hsl(var(--primary))" />
       </div>
       
-      <h1 className="text-2xl font-headline font-bold self-start">Sign up</h1>
+      <h1 className="text-3xl font-headline font-bold self-start">Sign up</h1> {/* Matched size with LoginForm */}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4"> {/* Kept space-y-4 for compactness */}
           <FormField
             control={form.control}
             name="name"
@@ -184,32 +184,32 @@ export function RegisterForm() {
 
           {error && <p className="text-sm font-medium text-destructive text-center">{error}</p>}
           
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-base mt-2" disabled={loading}>
+          <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground text-base" disabled={loading}> {/* Matched h-12 */}
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'SIGN UP'}
             {!loading && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
         </form>
       </Form>
 
-      <div className="relative w-full flex items-center justify-center my-3">
+      <div className="relative w-full flex items-center justify-center my-4"> {/* Matched my-4 */}
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-border" />
         </div>
         <span className="relative bg-background px-2 text-sm text-muted-foreground">OR</span>
       </div>
 
-      <div className="w-full space-y-2">
-        <Button variant="outline" className="w-full text-foreground justify-start border-input hover:bg-accent">
+      <div className="w-full space-y-3"> {/* Matched space-y-3 */}
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent"> {/* Matched h-12 */}
           <GoogleIcon />
           <span className="flex-grow text-center">Sign up with Google</span>
         </Button>
-        <Button variant="outline" className="w-full text-foreground justify-start border-input hover:bg-accent">
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent"> {/* Matched h-12 */}
           <FacebookIcon />
           <span className="flex-grow text-center">Sign up with Facebook</span>
         </Button>
       </div>
 
-      <p className="mt-3 text-center text-sm text-muted-foreground">
+      <p className="mt-6 text-center text-sm text-muted-foreground"> {/* Matched mt-6 */}
         Already have an account?{' '}
         <Link href="/login" className="font-medium text-primary hover:underline">
           Sign in
