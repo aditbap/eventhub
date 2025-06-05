@@ -49,7 +49,7 @@ const FacebookIcon = () => (
 
 export function LoginForm() {
   const { login, loading } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // error state is still used internally
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -72,6 +72,8 @@ export function LoginForm() {
       } else {
         setError(err.message || 'Failed to login. Please check your credentials.');
       }
+      // console.error is good for developers, but the user won't see this on the UI anymore
+      console.error("Login attempt failed:", err);
     }
   }
 
@@ -153,8 +155,8 @@ export function LoginForm() {
               Forgot Password?
             </Link>
           </div>
-
-          {error && <p className="text-sm font-medium text-destructive text-center">{error}</p>}
+          
+          {/* The error message display has been removed from here */}
           
           <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground text-base" disabled={loading}>
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'SIGN IN'}
