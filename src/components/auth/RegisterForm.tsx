@@ -76,21 +76,21 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="relative flex flex-col w-full space-y-5 pt-6 pb-8">
-      <div className="absolute top-4 left-0">
+    <div className="relative flex flex-col w-full space-y-3 pt-2 pb-4"> {/* Reduced pt, pb and space-y */}
+      <div className="absolute top-2 left-0"> {/* Adjusted top for back button */}
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
       </div>
 
-      <div className="w-full flex justify-center mb-0 pt-2">
-        <UpjLogo className="h-16 w-auto" fill="hsl(var(--primary))" />
+      <div className="w-full flex justify-center mb-0 pt-1"> {/* Reduced pt */}
+        <UpjLogo className="h-12 w-auto" fill="hsl(var(--primary))" /> {/* Slightly smaller logo */}
       </div>
       
-      <h1 className="text-3xl font-headline font-bold self-start pt-0">Sign up</h1>
+      <h1 className="text-2xl font-headline font-bold self-start pt-0">Sign up</h1> {/* Slightly smaller title */}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full space-y-3"> {/* Reduced space-y */}
           <FormField
             control={form.control}
             name="name"
@@ -99,7 +99,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Full name" {...field} className="pl-10 h-12 rounded-md border-input focus:border-primary" />
+                    <Input placeholder="Full name" {...field} className="pl-10 h-11 rounded-md border-input focus:border-primary" /> {/* Reduced h */}
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -114,7 +114,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-12 rounded-md border-input focus:border-primary" />
+                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-11 rounded-md border-input focus:border-primary" /> {/* Reduced h */}
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -133,7 +133,7 @@ export function RegisterForm() {
                       type={showPassword ? 'text' : 'password'} 
                       placeholder="Your password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12 rounded-md border-input focus:border-primary"
+                      className="pl-10 pr-10 h-11 rounded-md border-input focus:border-primary" /* Reduced h */
                     />
                     <Button 
                       type="button" 
@@ -163,7 +163,7 @@ export function RegisterForm() {
                       type={showConfirmPassword ? 'text' : 'password'} 
                       placeholder="Confirm password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12 rounded-md border-input focus:border-primary"
+                      className="pl-10 pr-10 h-11 rounded-md border-input focus:border-primary" /* Reduced h */
                     />
                     <Button 
                       type="button" 
@@ -184,32 +184,32 @@ export function RegisterForm() {
 
           {error && <p className="text-sm font-medium text-destructive text-center">{error}</p>}
           
-          <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground text-base mt-6" disabled={loading}>
+          <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground text-base mt-4" disabled={loading}> {/* Reduced h and mt */}
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'SIGN UP'}
             {!loading && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
         </form>
       </Form>
 
-      <div className="relative w-full flex items-center justify-center my-4">
+      <div className="relative w-full flex items-center justify-center my-3"> {/* Reduced my */}
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-border" />
         </div>
         <span className="relative bg-background px-2 text-sm text-muted-foreground">OR</span>
       </div>
 
-      <div className="w-full space-y-3">
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent">
+      <div className="w-full space-y-2"> {/* Reduced space-y */}
+        <Button variant="outline" className="w-full h-11 text-foreground justify-start border-input hover:bg-accent"> {/* Reduced h */}
           <GoogleIcon />
           <span className="flex-grow text-center">Sign up with Google</span>
         </Button>
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start border-input hover:bg-accent">
+        <Button variant="outline" className="w-full h-11 text-foreground justify-start border-input hover:bg-accent"> {/* Reduced h */}
           <FacebookIcon />
           <span className="flex-grow text-center">Sign up with Facebook</span>
         </Button>
       </div>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
+      <p className="mt-4 text-center text-sm text-muted-foreground"> {/* Reduced mt */}
         Already have an account?{' '}
         <Link href="/login" className="font-medium text-primary hover:underline">
           Sign in
@@ -218,3 +218,5 @@ export function RegisterForm() {
     </div>
   );
 }
+
+    
