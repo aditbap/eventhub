@@ -22,7 +22,7 @@ import { UpjLogo } from '@/components/icons/UpjLogo';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
-  email: z.string().email({ message: 'Invalid email address.' }),
+  email: z.string().email({ message: 'Invalid email address.' }), // Zod handles basic email format validation
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' })
 }).refine(data => data.password === data.confirmPassword, {
@@ -68,7 +68,15 @@ export function RegisterForm() {
     try {
       await register(values.name, values.email, values.password);
     } catch (err: any) {
-      setError(err.message || 'Failed to register. Please try again.');
+      if (err.code === 'auth/email-already-in-use') {
+        setError("Email already in use.");
+      } else if (err.code === 'auth/invalid-email') {
+        setError("Invalid email address format."); // Should be caught by Zod, but as a fallback
+      }
+      else {
+        setError(err.message || 'Failed to register. Please try again.');
+      }
+      console.error("Registration attempt failed:", err.code, err.message, err);
     }
   }
 
@@ -79,6 +87,7 @@ export function RegisterForm() {
     } catch (err: any) {
       let userMessage = 'Failed to sign up with Google. Please try again.';
        if (err.code) {
+        console.error("Google Sign-Up Error Code:", err.code);
         switch (err.code) {
           case 'auth/popup-closed-by-user':
             userMessage = 'Google Sign-Up was cancelled. Please try again.';
@@ -90,12 +99,21 @@ export function RegisterForm() {
              userMessage = 'Google Sign-Up was cancelled. Please ensure popups are not blocked and try again.';
             break;
           case 'auth/unauthorized-domain':
-            userMessage = 'This domain is not authorized for Google Sign-Up. Please contact support.';
+            userMessage = 'This domain is not authorized for Google Sign-Up. Please contact support if this issue persists.';
             break;
+          case 'auth/operation-not-allowed':
+            userMessage = 'Google Sign-Up is not enabled. Please contact support.';
+            break;
+          case 'auth/internal-error':
+            userMessage = 'An internal error occurred during Google Sign-Up. Please try again later.';
+            break;
+          default:
+            userMessage = `Google Sign-Up failed: ${err.message || 'Please try again.'}`;
         }
+      } else {
+        console.error("Google Sign-Up Error (no code):", err.message, err);
       }
       setError(userMessage);
-      console.error("Google sign up failed:", err.code, err.message, err);
     }
   };
 
@@ -123,7 +141,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Full name" {...field} className="pl-10" />
+                    <Input placeholder="Full name" {...field} className="pl-10 h-12" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -138,7 +156,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="abc@email.com" {...field} className="pl-10" />
+                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-12" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -157,7 +175,7 @@ export function RegisterForm() {
                       type={showPassword ? 'text' : 'password'} 
                       placeholder="Your password" 
                       {...field} 
-                      className="pl-10 pr-10"
+                      className="pl-10 pr-10 h-12"
                     />
                     <Button 
                       type="button" 
@@ -187,7 +205,7 @@ export function RegisterForm() {
                       type={showConfirmPassword ? 'text' : 'password'} 
                       placeholder="Confirm password" 
                       {...field} 
-                      className="pl-10 pr-10"
+                      className="pl-10 pr-10 h-12"
                     />
                     <Button 
                       type="button" 
