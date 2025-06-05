@@ -10,24 +10,28 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   updateProfile,
-  type User as FirebaseUser // Import actual Firebase User type
+  GoogleAuthProvider, // Added
+  signInWithPopup,    // Added
+  getAdditionalUserInfo, // Added
+  type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Added getDoc, serverTimestamp
 import { useRouter, usePathname } from 'next/navigation';
 
-// Define a simpler User type for the context or use FirebaseUser
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null; // Added for Google Sign-In
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email?: string, password?: string) => Promise<void>;
-  register: (name?: string, email?: string, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>; // Made params non-optional
+  register: (name: string, email: string, password: string) => Promise<void>; // Made params non-optional
   logout: () => Promise<void>;
+  loginWithGoogle: () => Promise<void>; // Added
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -45,6 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
         });
       } else {
         setUser(null);
@@ -54,27 +59,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const login = useCallback(async (email?: string, password?: string) => {
-    if (!email || !password) {
+  const login = useCallback(async (email: string, password: string) => { // Updated signature
+    if (!email || !password) { // Kept for safety, though type system should catch it
       throw new Error("Email and password are required.");
     }
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
-        setUser({ uid: userCredential.user.uid, email: userCredential.user.email, displayName: userCredential.user.displayName });
+        setUser({ 
+          uid: userCredential.user.uid, 
+          email: userCredential.user.email, 
+          displayName: userCredential.user.displayName,
+          photoURL: userCredential.user.photoURL 
+        });
         router.push('/explore');
       }
     } catch (error) {
       console.error("Login failed:", error);
-      throw error; // Re-throw to be caught by form
+      throw error; 
     } finally {
       setLoading(false);
     }
   }, [router]);
 
-  const register = useCallback(async (name?: string, email?: string, password?: string) => {
-    if (!name || !email || !password) {
+  const register = useCallback(async (name: string, email: string, password: string) => { // Updated signature
+    if (!name || !email || !password) { // Kept for safety
       throw new Error("Name, email, and password are required.");
     }
     setLoading(true);
@@ -82,18 +92,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: name });
-        // Optionally, store additional user info in Firestore
+        
         await setDoc(doc(db, "users", userCredential.user.uid), {
           uid: userCredential.user.uid,
           displayName: name,
           email: email,
-          createdAt: new Date(), // Or serverTimestamp()
+          photoURL: userCredential.user.photoURL || null,
+          createdAt: serverTimestamp(), 
         });
-        setUser({ uid: userCredential.user.uid, email: userCredential.user.email, displayName: name });
+        setUser({ 
+          uid: userCredential.user.uid, 
+          email: userCredential.user.email, 
+          displayName: name,
+          photoURL: userCredential.user.photoURL
+        });
         router.push('/explore');
       }
     } catch (error) {
       console.error("Registration failed:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
+
+  const loginWithGoogle = useCallback(async () => {
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+      if (firebaseUser) {
+        // Check if user is new or existing to decide on Firestore write
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) { // New user via Google
+          await setDoc(userDocRef, {
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName,
+            email: firebaseUser.email,
+            photoURL: firebaseUser.photoURL,
+            createdAt: serverTimestamp(),
+          });
+        }
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+        });
+        router.push('/explore');
+      }
+    } catch (error) {
+      console.error("Google login failed:", error);
+      // Handle specific errors like 'auth/popup-closed-by-user' if needed
       throw error;
     } finally {
       setLoading(false);
@@ -134,7 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

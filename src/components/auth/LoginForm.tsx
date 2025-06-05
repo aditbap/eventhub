@@ -28,7 +28,6 @@ const formSchema = z.object({
   rememberMe: z.boolean().default(false),
 });
 
-// Simple SVG for Google Icon
 const GoogleIcon = () => (
   <svg viewBox="0 0 48 48" className="h-5 w-5">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -39,7 +38,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-// Updated Facebook Icon SVG
 const FacebookIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
       <path d="M9.19795 21.5H13.198V13.4901H16.8021L17.198 9.50977H13.198V7.5C13.198 6.94772 13.6457 6.5 14.198 6.5H17.198V2.5H14.198C11.4365 2.5 9.19795 4.73858 9.19795 7.5V9.50977H7.19795L6.80206 13.4901H9.19795V21.5Z" />
@@ -48,7 +46,7 @@ const FacebookIcon = () => (
 
 
 export function LoginForm() {
-  const { login, loading } = useAuth();
+  const { login, loginWithGoogle, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -65,9 +63,8 @@ export function LoginForm() {
     setError(null);
     try {
       await login(values.email, values.password);
-      // Redirect is handled by AuthContext/page.tsx
     } catch (err: any) {
-      if (err.code === 'auth/invalid-credential') {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError('Invalid password or email');
       } else {
         setError(err.message || 'Failed to login. Please check your credentials.');
@@ -75,6 +72,16 @@ export function LoginForm() {
       console.error("Login attempt failed:", err);
     }
   }
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      setError(err.message || 'Failed to login with Google. Please try again.');
+      console.error("Google login failed:", err);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center w-full space-y-6">
@@ -172,11 +179,11 @@ export function LoginForm() {
       </div>
 
       <div className="w-full space-y-3">
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start">
-          <GoogleIcon />
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start" onClick={handleGoogleLogin} disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
           <span className="flex-grow text-center">Login with Google</span>
         </Button>
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start">
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start" disabled>
           <FacebookIcon />
           <span className="flex-grow text-center">Login with Facebook</span>
         </Button>

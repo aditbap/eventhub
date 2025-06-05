@@ -30,7 +30,6 @@ const formSchema = z.object({
   path: ["confirmPassword"],
 });
 
-// Simple SVG for Google Icon (copied from LoginForm)
 const GoogleIcon = () => (
   <svg viewBox="0 0 48 48" className="h-5 w-5">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -41,7 +40,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-// Updated Facebook Icon SVG (copied from LoginForm)
 const FacebookIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
     <path d="M15.12 5.32H17.94V2.14C17.44 2.09 16.23 2 14.86 2C11.98 2 10.05 3.83 10.05 6.7V9.25H7.06V12.84H10.05V22H13.54V12.84H16.39L16.81 9.25H13.54V7.05C13.54 5.95 13.84 5.32 15.12 5.32Z"/>
@@ -49,7 +47,7 @@ const FacebookIcon = () => (
 );
 
 export function RegisterForm() {
-  const { register, loading } = useAuth();
+  const { register, loginWithGoogle, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -69,15 +67,24 @@ export function RegisterForm() {
     setError(null);
     try {
       await register(values.name, values.email, values.password);
-      // Redirect is handled by AuthContext/page.tsx or AuthProvider
     } catch (err: any) {
       setError(err.message || 'Failed to register. Please try again.');
     }
   }
 
+  const handleGoogleSignUp = async () => {
+    setError(null);
+    try {
+      await loginWithGoogle(); // Reuses loginWithGoogle which handles new user creation in Firestore
+    } catch (err: any) {
+      setError(err.message || 'Failed to sign up with Google. Please try again.');
+      console.error("Google sign up failed:", err);
+    }
+  };
+
   return (
     <div className="relative flex flex-col w-full space-y-6">
-      <div className="absolute top-0 left-[-8px] sm:left-0"> {/* Adjusted for better positioning with layout padding */}
+      <div className="absolute top-0 left-[-8px] sm:left-0"> 
         <Button variant="ghost" size="icon" onClick={() => router.push('/login')} aria-label="Go back to login">
           <ArrowLeft className="h-6 w-6" />
         </Button>
@@ -199,11 +206,11 @@ export function RegisterForm() {
       </div>
 
       <div className="w-full space-y-3">
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start">
-          <GoogleIcon />
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start" onClick={handleGoogleSignUp} disabled={loading}>
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
           <span className="flex-grow text-center">Sign up with Google</span>
         </Button>
-        <Button variant="outline" className="w-full h-12 text-foreground justify-start">
+        <Button variant="outline" className="w-full h-12 text-foreground justify-start" disabled>
           <FacebookIcon />
           <span className="flex-grow text-center">Sign up with Facebook</span>
         </Button>
