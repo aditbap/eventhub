@@ -67,7 +67,11 @@ export function LoginForm() {
       await login(values.email, values.password);
       // Redirect is handled by AuthContext/page.tsx
     } catch (err: any) {
-      setError(err.message || 'Failed to login. Please check your credentials.');
+      if (err.code === 'auth/invalid-credential') {
+        setError('Invalid password or email');
+      } else {
+        setError(err.message || 'Failed to login. Please check your credentials.');
+      }
     }
   }
 
