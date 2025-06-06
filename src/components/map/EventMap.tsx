@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap } from 'leaflet';
@@ -11,12 +11,12 @@ import { Button } from '@/components/ui/button';
 import type { Event } from '@/types';
 
 const getCategoryIcon = (category?: string): LeafletIconType => {
-  let color = '#757575'; 
+  let color = '#757575'; // Default grey
   switch (category) {
-    case 'Music': color = '#F97068'; break;
-    case 'Food': color = '#4CAF50'; break;
-    case 'Sports': color = '#FFA000'; break;
-    case 'Tech': color = '#3B82F6'; break;
+    case 'Music': color = '#F97068'; break; // Coral Red
+    case 'Food': color = '#4CAF50'; break;  // Grass Green
+    case 'Sports': color = '#FFA000'; break; // Amber Orange
+    case 'Tech': color = '#3B82F6'; break; // Blue-500 for Tech
   }
 
   const svgIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" class="event-marker-svg">
@@ -56,69 +56,58 @@ interface EventMapProps {
 }
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
-  const mapRef = useRef<LeafletMap | null>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
   const [clientSideReady, setClientSideReady] = useState(false);
-  const [containerKey, setContainerKey] = useState(0); // Key for MapContainer
+  const [mapContainerKey, setMapContainerKey] = useState(() => Date.now()); // Unique key for MapContainer
 
   useEffect(() => {
-    console.log("EventMapComponent: Mount effect executing.");
+    console.log(`EventMapComponent Effect (Mount/Remount): Current key to be used: ${mapContainerKey}`);
     setClientSideReady(true);
-    setContainerKey(prevKey => {
-      const newKey = prevKey + 1;
-      console.log(`EventMapComponent: Setting new containerKey: ${newKey}`);
-      return newKey;
-    });
+    
+    // If EventMapComponent is remounted (e.g. StrictMode), generate a new key for MapContainer
+    // This forces MapContainer to be a new instance with a new DOM node.
+    setMapContainerKey(Date.now()); 
 
+    // The cleanup function will be associated with THIS instance of EventMapComponent
+    // and the map instance IT created (which should be in mapInstanceRef.current).
     return () => {
-      console.log("EventMapComponent: Unmount cleanup executing.");
-      if (mapRef.current) {
-        const mapId = (mapRef.current as any)._leaflet_id; // Access internal ID for logging
-        console.log(`Attempting to remove map instance ID: ${mapId}`);
+      console.log(`EventMapComponent Cleanup: mapInstanceRef.current ID is ${mapInstanceRef.current ? (mapInstanceRef.current as any)._leaflet_id : 'null'}`);
+      if (mapInstanceRef.current) {
+        const mapId = (mapInstanceRef.current as any)._leaflet_id;
+        console.log(`EventMapComponent Cleanup: Attempting to remove map instance ID: ${mapId}`);
         try {
-          mapRef.current.remove();
-          console.log(`Map instance (ID: ${mapId}) remove() called successfully.`);
+          mapInstanceRef.current.remove();
+          console.log(`EventMapComponent Cleanup: Map instance (ID: ${mapId}) remove() called successfully.`);
         } catch (e) {
-          console.error(`Error calling map.remove() for map ID ${mapId}:`, e);
+          console.error(`EventMapComponent Cleanup: Error calling map.remove() for map ID ${mapId}:`, e);
         }
-        mapRef.current = null; 
-        console.log("mapRef.current set to null after removal attempt.");
+        mapInstanceRef.current = null; // Clear the ref for this unmounted instance
       } else {
-        console.log("EventMapComponent Unmount: mapRef.current was already null or not set.");
+        console.log("EventMapComponent Cleanup: No map instance in mapInstanceRef to remove.");
       }
     };
-  }, []); 
+  }, []); // Empty dependency array means this effect runs on mount and its cleanup on unmount.
 
   if (!clientSideReady) {
     console.log("EventMapComponent: Not client-side ready yet, rendering null.");
     return null;
   }
 
-  console.log(`EventMapComponent: Rendering MapContainer with key: ${containerKey}. Current mapRef ID: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+  console.log(`EventMapComponent: Rendering MapContainer with key: ${mapContainerKey}. Current mapInstanceRef ID: ${mapInstanceRef.current ? (mapInstanceRef.current as any)._leaflet_id : 'null'}`);
+  
   return (
     <MapContainer
-      key={containerKey} 
+      key={mapContainerKey} // This key is crucial.
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
-      whenCreated={(mapInstance) => {
-        const newMapId = (mapInstance as any)._leaflet_id;
-        if (mapRef.current) {
-            const oldMapId = (mapRef.current as any)._leaflet_id;
-            console.warn(
-              `MapContainer whenCreated (key: ${containerKey}): mapRef.current (ID: ${oldMapId}) was unexpectedly already set. ` +
-              `New mapInstance ID: ${newMapId}. This might indicate an issue. Removing old ref's map before assigning new one.`
-            );
-            // This scenario is less likely with the keying strategy but added for extreme robustness
-            try {
-              mapRef.current.remove();
-            } catch (e) {
-              console.error(`Error removing stale mapRef.current (ID: ${oldMapId}) in whenCreated:`, e);
-            }
-        }
-        mapRef.current = mapInstance;
-        console.log(`MapContainer whenCreated (key: ${containerKey}): map instance (ID: ${newMapId}) assigned to mapRef.current.`);
+      whenCreated={(map) => {
+        const newMapId = (map as any)._leaflet_id;
+        console.log(`MapContainer whenCreated (key: ${mapContainerKey}): map instance (ID: ${newMapId}) created. Assigning to mapInstanceRef.`);
+        // This component instance now owns this map instance.
+        mapInstanceRef.current = map;
       }}
     >
       <TileLayer
@@ -149,6 +138,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   );
 }
 
-const EventMap = React.memo(EventMapComponent);
+const EventMap = memo(EventMapComponent);
+EventMap.displayName = 'EventMap';
 
 export default EventMap;
