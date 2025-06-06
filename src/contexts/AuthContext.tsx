@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!email || !password) {
       throw new Error("Email and password are required.");
     }
-    setLoading(true);
+    // setLoading(true); // Removed to prevent global loader during login if already on login page
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
@@ -78,7 +78,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Login failed:", error);
       throw error; 
     } finally {
-      setLoading(false);
+      // setLoading(false); // Auth state change will handle this
     }
   }, [setUser]); 
 
@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: email,
           photoURL: userCredential.user.photoURL || null,
           createdAt: serverTimestamp(), 
-          updatedAt: serverTimestamp() // Added updatedAt
+          updatedAt: serverTimestamp()
         };
         await setDoc(doc(db, "users", userCredential.user.uid), userData);
 
@@ -108,6 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
+        // Navigation to /explore will be handled by the useEffect below once user state is set
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -127,23 +128,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
 
-        if (!userDoc.exists()) {
-          const googleUserData = {
+        const googleUserData = {
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName || null,
             email: firebaseUser.email || null,
             photoURL: firebaseUser.photoURL || null,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp() // Added updatedAt
-          };
-          await setDoc(userDocRef, googleUserData);
-        } else {
-          // If user document exists, update updatedAt timestamp
-           await updateDoc(userDocRef, { 
             updatedAt: serverTimestamp(),
-            // Optionally update displayName and photoURL if they might have changed in Google account
-            displayName: firebaseUser.displayName || userDoc.data()?.displayName || null,
-            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null,
+        };
+
+        if (!userDoc.exists()) {
+          await setDoc(userDocRef, {
+            ...googleUserData,
+            createdAt: serverTimestamp(),
+          });
+        } else {
+           await updateDoc(userDocRef, { 
+            ...googleUserData,
+            displayName: firebaseUser.displayName || userDoc.data()?.displayName || null, // Keep existing if new is null
+            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null, // Keep existing if new is null
           });
         }
         setUser({
@@ -152,6 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
+        // Navigation to /explore will be handled by the useEffect below
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -181,15 +184,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setUser]); 
 
   const logout = useCallback(async () => {
-    setLoading(true);
+    // setLoading(true); // No need to set loading true, onAuthStateChanged will handle it.
     try {
       await signOut(auth);
-      setUser(null);
+      setUser(null); // This will trigger onAuthStateChanged
       router.push('/login'); 
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      setLoading(false);
+      // setLoading(false); // onAuthStateChanged sets loading to false
     }
   }, [router, setUser]); 
 
@@ -201,45 +204,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!trimmedNewName) {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
-
+  
     const userToUpdate = auth.currentUser;
     
-    console.log(`updateUserName: Attempting to update name for UID: ${userToUpdate.uid} to "${trimmedNewName}"`);
     console.time("updateUserNameFirebase");
-
+    console.log(`updateUserName: Attempting to update name for UID: ${userToUpdate.uid} to "${trimmedNewName}"`);
+  
     try {
-      console.log("updateUserName: Updating Firebase Auth profile...");
+      console.log("updateUserName: Attempting to update Firebase Auth profile...");
       await updateProfile(userToUpdate, { displayName: trimmedNewName });
       console.log("updateUserName: Firebase Auth profile updated successfully.");
-
+  
       const userDocRef = doc(db, "users", userToUpdate.uid);
-      console.log(`updateUserName: Checking Firestore document users/${userToUpdate.uid}...`);
+      console.log(`updateUserName: Checking Firestore document at users/${userToUpdate.uid}...`);
       const docSnap = await getDoc(userDocRef);
-
+  
+      const userDataToUpdate = {
+        displayName: trimmedNewName,
+        photoURL: userToUpdate.photoURL || null, // Ensure photoURL is consistent
+        email: userToUpdate.email || null, // Ensure email is consistent
+        updatedAt: serverTimestamp()
+      };
+  
       if (docSnap.exists()) {
         console.log("updateUserName: Firestore document exists. Updating with new name and updatedAt...");
-        await updateDoc(userDocRef, { 
-          displayName: trimmedNewName,
-          updatedAt: serverTimestamp() 
-        });
+        await updateDoc(userDocRef, userDataToUpdate);
         console.log("updateUserName: Firestore document updated successfully.");
       } else {
-        console.warn(`updateUserName: Firestore document users/${userToUpdate.uid} not found. Creating document with new name.`);
+        console.warn(`updateUserName: Firestore document users/${userToUpdate.uid} not found. Creating document.`);
         await setDoc(userDocRef, {
           uid: userToUpdate.uid,
-          displayName: trimmedNewName,
-          email: userToUpdate.email || null,
-          photoURL: userToUpdate.photoURL || null,
-          createdAt: serverTimestamp(), // This marks the creation of this 'repaired' doc
-          updatedAt: serverTimestamp()
+          ...userDataToUpdate, // includes new displayName, photoURL, email, updatedAt
+          createdAt: serverTimestamp() // Set createdAt only if creating new doc
         });
-        console.log("updateUserName: Firestore document created successfully for missing user.");
+        console.log("updateUserName: Firestore document created successfully.");
       }
       
-      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
+      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName, photoURL: userToUpdate.photoURL } : null);
       console.timeEnd("updateUserNameFirebase");
       return { success: true };
-
+  
     } catch (err: any) {
       console.timeEnd("updateUserNameFirebase"); 
       console.warn(`AuthContext: Failed to update user name. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -251,29 +255,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [setUser, db]); 
   
+  // Redirect unauthenticated users from protected pages
   useEffect(() => {
-    const allowedUnauthenticatedPaths = [
-      '/login',
-      '/register',
-      '/reset-password',
-      '/new-password', 
-    ];
+    const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings'];
+    // Add more specific protected paths if needed
+    // Example: /events/[eventId] is implicitly protected by /events parent
 
-    if (
-      !loading &&
-      !user &&
-      !pathname.startsWith('/_next/') && 
-      !allowedUnauthenticatedPaths.some(p => pathname === p || pathname.startsWith(p + '/')) &&
-      pathname !== '/' 
-    ) {
+    const isProtectedPath = protectedAppPaths.some(p => pathname.startsWith(p));
+
+    if (!loading && !user && isProtectedPath) {
       router.replace('/login');
     }
   }, [user, loading, pathname, router]);
 
+  // Redirect authenticated users from auth pages (like login, register) to explore
   useEffect(() => {
-    const authPages = ['/login', '/register', '/reset-password', '/new-password'];
-    if (!loading && user && (authPages.includes(pathname) || pathname === '/')) {
-      router.replace('/explore'); 
+    // '/new-password' is removed so logged-in users can access it from settings
+    const authPagesForRedirect = ['/login', '/register', '/reset-password']; 
+    if (!loading && user && (authPagesForRedirect.includes(pathname) || pathname === '/')) {
+      router.replace('/explore');
     }
   }, [user, loading, pathname, router]);
 
@@ -286,3 +286,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export default AuthContext;
+
+    
