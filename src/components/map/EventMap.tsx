@@ -1,18 +1,17 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react'; // Import React, useEffect, useRef, useState
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L, { type Map as LeafletMap } from 'leaflet'; // Import L and LeafletMap type
+import L, { type Map as LeafletMap } from 'leaflet';
 import type { Icon as LeafletIconType } from 'leaflet';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { Event } from '@/types';
 
-// Custom icons per category
 const getCategoryIcon = (category?: string): LeafletIconType => {
-  let color = '#757575'; // Grey for Other/Default or undefined category
+  let color = '#757575'; 
   switch (category) {
     case 'Music': color = '#F97068'; break;
     case 'Food': color = '#4CAF50'; break;
@@ -27,14 +26,13 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
 
   return L.divIcon({
     html: svgIconHtml,
-    className: 'custom-leaflet-div-icon', // Important for removing default Leaflet icon styles
+    className: 'custom-leaflet-div-icon',
     iconSize: [32, 32],
-    iconAnchor: [16, 32], // Point of the icon that corresponds to marker's location
-    popupAnchor: [0, -32], // Point from which the popup should open relative to the iconAnchor
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
   });
 };
 
-// Using unpkg CDN for default icon images to avoid asset path issues with Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -45,7 +43,6 @@ L.Icon.Default.mergeOptions({
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
-
 
 export interface MapPageEvent extends Pick<Event, 'id' | 'title' | 'category' | 'location'> {
   latitude: number;
@@ -58,38 +55,70 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Define the component logic
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  const [isClient, setIsClient] = useState(false); // State to track client-side mount
+  const [clientSideReady, setClientSideReady] = useState(false);
+  const [containerKey, setContainerKey] = useState(0); // Key for MapContainer
 
   useEffect(() => {
-    setIsClient(true); // Set to true once component has mounted on the client
+    console.log("EventMapComponent: Mount effect executing.");
+    setClientSideReady(true);
+    setContainerKey(prevKey => {
+      const newKey = prevKey + 1;
+      console.log(`EventMapComponent: Setting new containerKey: ${newKey}`);
+      return newKey;
+    });
 
-    // Cleanup function: will be called when the component unmounts
     return () => {
+      console.log("EventMapComponent: Unmount cleanup executing.");
       if (mapRef.current) {
-        mapRef.current.remove(); // Explicitly remove the map instance
-        mapRef.current = null;
+        const mapId = (mapRef.current as any)._leaflet_id; // Access internal ID for logging
+        console.log(`Attempting to remove map instance ID: ${mapId}`);
+        try {
+          mapRef.current.remove();
+          console.log(`Map instance (ID: ${mapId}) remove() called successfully.`);
+        } catch (e) {
+          console.error(`Error calling map.remove() for map ID ${mapId}:`, e);
+        }
+        mapRef.current = null; 
+        console.log("mapRef.current set to null after removal attempt.");
+      } else {
+        console.log("EventMapComponent Unmount: mapRef.current was already null or not set.");
       }
     };
-  }, []); // Empty dependency array ensures this effect runs once on mount and cleanup on unmount
+  }, []); 
 
-  if (!isClient) {
-    // If not yet mounted on client, return null. 
-    // The `loading` prop of the `dynamic` import in MapPage will handle the visual placeholder.
+  if (!clientSideReady) {
+    console.log("EventMapComponent: Not client-side ready yet, rendering null.");
     return null;
   }
 
+  console.log(`EventMapComponent: Rendering MapContainer with key: ${containerKey}. Current mapRef ID: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
   return (
     <MapContainer
+      key={containerKey} 
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
+        const newMapId = (mapInstance as any)._leaflet_id;
+        if (mapRef.current) {
+            const oldMapId = (mapRef.current as any)._leaflet_id;
+            console.warn(
+              `MapContainer whenCreated (key: ${containerKey}): mapRef.current (ID: ${oldMapId}) was unexpectedly already set. ` +
+              `New mapInstance ID: ${newMapId}. This might indicate an issue. Removing old ref's map before assigning new one.`
+            );
+            // This scenario is less likely with the keying strategy but added for extreme robustness
+            try {
+              mapRef.current.remove();
+            } catch (e) {
+              console.error(`Error removing stale mapRef.current (ID: ${oldMapId}) in whenCreated:`, e);
+            }
+        }
         mapRef.current = mapInstance;
+        console.log(`MapContainer whenCreated (key: ${containerKey}): map instance (ID: ${newMapId}) assigned to mapRef.current.`);
       }}
     >
       <TileLayer
@@ -120,7 +149,6 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   );
 }
 
-// Wrap the component with React.memo for performance optimization.
 const EventMap = React.memo(EventMapComponent);
 
 export default EventMap;
