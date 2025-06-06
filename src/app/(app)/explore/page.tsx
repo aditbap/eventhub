@@ -183,14 +183,13 @@ const MOCK_EVENTS: Event[] = [
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentCategory, setCurrentCategory] = useState<Event['category']>('Music'); // Default to Music
+  const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All'); // Default to All
   const [location, setLocation] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     setLoadingLocation(true);
-    // Simulate location detection with a slight delay
     setTimeout(() => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -199,13 +198,13 @@ export default function ExplorePage() {
             setLoadingLocation(false);
           },
           () => {
-            setLocation('Bintaro'); // Fallback for demo
+            setLocation('Bintaro'); 
             setLoadingLocation(false);
           },
           { timeout: 3000 }
         );
       } else {
-        setLocation('Bintaro'); // Fallback for demo
+        setLocation('Bintaro'); 
         setLoadingLocation(false);
       }
     }, 500);
@@ -213,12 +212,10 @@ export default function ExplorePage() {
 
   useEffect(() => {
     let events = MOCK_EVENTS;
-    // Ensure currentCategory is one of the valid categories or handle 'All' if needed
-    const validCategories: Event['category'][] = ['Music', 'Food', 'Sports', 'Tech', 'Other'];
-    if (validCategories.includes(currentCategory)) {
+    
+    if (currentCategory !== 'All') {
       events = events.filter(event => event.category === currentCategory);
     }
-    // else if currentCategory === 'All', no category filter is applied.
 
     if (searchQuery) {
       events = events.filter(event =>
@@ -232,12 +229,12 @@ export default function ExplorePage() {
   const upcomingEvents = filteredEvents
     .filter(e => new Date(e.date) >= new Date() && e.attendees && e.attendees.length > 0)
     .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5); // Limit to 5 or more as needed
+    .slice(0, 5); 
 
   const nearYouEvents = filteredEvents
     .filter(e => new Date(e.date) >= new Date() && (!e.attendees || e.attendees.length === 0))
     .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5); // Limit to 5 or more as needed
+    .slice(0, 5); 
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -259,7 +256,6 @@ export default function ExplorePage() {
           </div>
           <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-white/20 relative">
             <Bell className="h-6 w-6" />
-            {/* Example notification dot */}
             <span className="absolute top-2 right-2 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-primary" />
           </Button>
         </div>
@@ -280,22 +276,22 @@ export default function ExplorePage() {
         </div>
       </header>
 
-      <main className="flex-grow pt-16 pb-20"> {/* Increased pt for search bar, increased pb for nav */}
-        <div className="container mx-auto px-4"> {/* Added px-4 for consistent container padding */}
-          <CategoryFilter currentCategory={currentCategory} onSelectCategory={(cat) => setCurrentCategory(cat as Event['category'])} />
+      <main className="flex-grow pt-16 pb-20"> 
+        <div className="container mx-auto px-4"> 
+          <CategoryFilter currentCategory={currentCategory} onSelectCategory={(cat) => setCurrentCategory(cat)} />
           
-          <section className="mb-8"> {/* Increased margin bottom */}
-            <div className="flex justify-between items-center mb-4"> {/* Increased margin bottom */}
+          <section className="mb-8"> 
+            <div className="flex justify-between items-center mb-4"> 
               <h2 className="text-xl font-headline font-semibold">Upcoming Events</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />
               </Link>
             </div>
             {upcomingEvents.length > 0 ? (
-              <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1"> {/* Negative margin for edge cards */}
+              <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1"> 
                 <div className="flex space-x-4 pb-4">
                   {upcomingEvents.map((event) => (
-                    <div key={event.id} className="w-[280px] h-full flex-shrink-0"> {/* Adjusted width if needed */}
+                    <div key={event.id} className="w-[280px] h-full flex-shrink-0"> 
                         <EventCard event={event} variant="upcoming" />
                     </div>
                   ))}
@@ -303,12 +299,12 @@ export default function ExplorePage() {
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No upcoming events found for this category.</p>
+              <p className="text-muted-foreground text-center py-4">No upcoming events found for this category or search.</p>
             )}
           </section>
 
           <section>
-            <div className="flex justify-between items-center mb-4"> {/* Increased margin bottom */}
+            <div className="flex justify-between items-center mb-4"> 
               <h2 className="text-xl font-headline font-semibold">Near You</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />
@@ -321,7 +317,7 @@ export default function ExplorePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No events found near you for this category.</p>
+              <p className="text-muted-foreground text-center py-4">No events found near you for this category or search.</p>
             )}
           </section>
         </div>
