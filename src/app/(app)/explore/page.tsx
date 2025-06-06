@@ -265,7 +265,7 @@ export default function ExplorePage() {
             <Input
               type="search"
               placeholder="Search events, food, sports..."
-              className="flex-grow border-none focus:ring-0 pl-1 text-sm shadow-none bg-transparent h-9"
+              className="flex-grow border-none focus:ring-0 pl-1 text-sm shadow-none bg-transparent h-9 text-foreground"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
