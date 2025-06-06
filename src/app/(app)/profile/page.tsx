@@ -59,8 +59,13 @@ export default function ProfilePage() {
           userTickets.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
           setTickets(userTickets);
 
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error fetching tickets:', error);
+          toast({
+            title: "Error Fetching Tickets",
+            description: error.message || "Could not load your tickets. Please try again later.",
+            variant: "destructive",
+          });
         } finally {
           setLoadingTickets(false);
         }
@@ -69,7 +74,7 @@ export default function ProfilePage() {
     } else {
       setLoadingTickets(false);
     }
-  }, [user]);
+  }, [user, toast]); // Added toast to dependency array as it's used in the effect
 
   const handleOpenTicketDialog = (ticket: Ticket) => {
     setSelectedTicket(ticket);
