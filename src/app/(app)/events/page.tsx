@@ -8,10 +8,11 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Search, MoreVertical, Gift, Ticket, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Search, Filter as FilterIcon, Gift, Ticket, X as XIcon } from 'lucide-react'; // Changed MoreVertical to FilterIcon
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+// Removed DropdownMenu imports as they are no longer used with a simple Filter icon.
 
 export default function AllEventsPage() {
   const router = useRouter();
@@ -22,7 +23,6 @@ export default function AllEventsPage() {
 
   useEffect(() => {
     const eventsFromStore = eventStore.getEvents();
-    // Default sort: newest first. This is already handled by eventStore.getEvents()
     setAllEvents(eventsFromStore);
   }, []);
 
@@ -34,7 +34,6 @@ export default function AllEventsPage() {
         event.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    // Ensure events are sorted by date, newest first, after filtering
     currentEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setFilteredEvents(currentEvents);
   }, [searchQuery, allEvents]);
@@ -46,6 +45,11 @@ export default function AllEventsPage() {
   const handleCloseSearchClick = () => {
     setSearchActive(false);
     setSearchQuery('');
+  };
+
+  const handleFilterClick = () => {
+    // Placeholder for filter functionality
+    alert('Filter functionality will be implemented here!');
   };
 
   return (
@@ -78,8 +82,9 @@ export default function AllEventsPage() {
               <Search className="h-6 w-6" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted/20 rounded-full">
-            <MoreVertical className="h-6 w-6" />
+          {/* Changed MoreVertical to FilterIcon and added onClick handler */}
+          <Button variant="ghost" size="icon" onClick={handleFilterClick} className="text-foreground hover:bg-muted/20 rounded-full">
+            <FilterIcon className="h-6 w-6" />
           </Button>
         </div>
       </header>
