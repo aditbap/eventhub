@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
       }
     } catch (err: any) {
-      console.error("Registration failed in AuthContext:", err);
+      console.warn("Registration failed in AuthContext:", err); // Changed from console.error
       return { success: false, error: { code: err.code, message: err.message } };
     } finally {
       setLoading(false);
@@ -148,14 +148,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         router.push('/explore');
       }
     } catch (error: any) {
-      console.error("Google login failed. Raw error object:", error);
+      let userMessage = 'Failed to login with Google. Please try again.';
+      console.warn("Google login failed. Raw error object:", error); // Changed from console.error
       if (error.code) {
-        console.error("Error code:", error.code);
+        console.warn("Error code:", error.code); // Changed from console.error
+        switch (error.code) {
+          case 'auth/popup-closed-by-user':
+            userMessage = 'Google Sign-In was cancelled. Please try again.';
+            break;
+          case 'auth/popup-blocked':
+            userMessage = 'Google Sign-In popup was blocked by your browser. Please enable popups and try again.';
+            break;
+          case 'auth/cancelled-popup-request':
+             userMessage = 'Google Sign-In was cancelled. Please ensure popups are not blocked and try again.';
+            break;
+          case 'auth/unauthorized-domain':
+            userMessage = 'This domain is not authorized for Google Sign-In. Please contact support.';
+            break;
+        }
+      } else {
+         console.warn("Google login failed (no code):", error.message, error); // Changed from console.error
       }
-      if (error.message) {
-        console.error("Error message:", error.message);
-      }
-      throw error; 
+      // Re-throw the error for the calling component to handle and display userMessage
+      error.displayMessage = userMessage; 
+      throw error;
     } finally {
       setLoading(false);
     }
