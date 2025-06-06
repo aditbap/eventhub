@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState, memo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap } from 'leaflet';
-import type { Icon as LeafletIconType } from 'leaflet'; // Corrected import type
+import type { Icon as LeafletIconType } from 'leaflet';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { Event } from '@/types';
@@ -26,14 +26,14 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
 
   return L.divIcon({
     html: svgIconHtml,
-    className: 'custom-leaflet-div-icon', // Ensure this class is used for styling if needed
+    className: 'custom-leaflet-div-icon',
     iconSize: [32, 32],
-    iconAnchor: [16, 32], // Anchor point of the icon (bottom center)
-    popupAnchor: [0, -32], // Anchor point for popups relative to iconAnchor
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
   });
 };
 
-// @ts-ignore Default Leaflet icon path fix (common workaround)
+// @ts-ignore Default Leaflet icon path fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -56,54 +56,37 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Counter to help generate unique DOM IDs if multiple maps were on one page
-let mapIdCounter = 0;
+let mapIdCounter = 0; 
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapInstanceRef = useRef<LeafletMap | null>(null);
-  // Generate a unique ID for this map instance when the component mounts.
-  // This ID is used for the key and id of MapContainer.
-  // useState ensures this ID is stable for this component instance's lifetime
-  // but will be new if EventMapComponent itself is unmounted and remounted.
-  const [mapDomId] = useState(() => `leaflet-map-${mapIdCounter++}`);
+  const [mapContainerKey, setMapContainerKey] = useState(() => `leaflet-map-key-${mapIdCounter++}`);
 
   useEffect(() => {
-    // This effect is now primarily for cleanup.
-    // It captures the map instance associated with this component instance (and its mapDomId).
-    console.log(`EventMapComponent Effect setup for mapDomId: ${mapDomId}`);
-    
-    const instanceToCleanUp = mapInstanceRef.current; // Capture the instance at the time of effect setup
+    const currentMapInstance = mapInstanceRef.current;
+    console.log(`EventMapComponent Effect setup. Key: ${mapContainerKey}. Current map instance: ${currentMapInstance ? 'exists' : 'null'}`);
 
     return () => {
-      console.log(`EventMapComponent Cleanup for mapDomId: ${mapDomId}. Instance to clean up: ${instanceToCleanUp ? 'exists' : 'null'}`);
-      if (instanceToCleanUp) {
-        const leafletId = (instanceToCleanUp as any)._leaflet_id;
-        console.log(`EventMapComponent Cleanup: Removing map instance ID: ${leafletId} associated with mapDomId: ${mapDomId}`);
-        instanceToCleanUp.remove();
-      }
-      // If mapInstanceRef.current was this instance, it's now gone.
-      // If a new instance quickly replaced it, mapInstanceRef.current would point to the new one,
-      // but instanceToCleanUp would correctly point to the old one.
-      if (mapInstanceRef.current === instanceToCleanUp) {
-        mapInstanceRef.current = null;
+      console.log(`EventMapComponent Cleanup for key: ${mapContainerKey}. Map instance to remove: ${currentMapInstance ? (currentMapInstance as any)._leaflet_id : 'null'}`);
+      if (currentMapInstance) {
+        currentMapInstance.remove();
       }
     };
-  }, [mapDomId]); // The effect and its cleanup are tied to mapDomId.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
-  console.log(`EventMapComponent Render. MapContainer key/id: ${mapDomId}. Current mapInstanceRef: ${mapInstanceRef.current ? (mapInstanceRef.current as any)._leaflet_id : 'null'}`);
+  console.log(`EventMapComponent Render. MapContainer key: ${mapContainerKey}. Current mapInstanceRef: ${mapInstanceRef.current ? (mapInstanceRef.current as any)._leaflet_id : 'null'}`);
   
   return (
     <MapContainer
-      key={mapDomId} // Crucial: Forces React to treat this as a new component if mapDomId changes
-      id={mapDomId}   // Also set the DOM ID for Leaflet to target
+      key={mapContainerKey} 
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(map) => {
-        // This callback is invoked when Leaflet initializes the map for this MapContainer instance.
-        console.log(`MapContainer whenCreated for ID ${mapDomId}: New map instance (Leaflet ID: ${(map as any)._leaflet_id}). Setting mapInstanceRef.`);
+        console.log(`MapContainer whenCreated for key ${mapContainerKey}: New map instance (Leaflet ID: ${(map as any)._leaflet_id}). Setting mapInstanceRef.`);
         mapInstanceRef.current = map;
       }}
     >
@@ -113,7 +96,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id} // Event ID is unique for markers within this map instance
+          key={event.id} 
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
@@ -139,3 +122,5 @@ const EventMap = memo(EventMapComponent);
 EventMap.displayName = 'EventMap';
 
 export default EventMap;
+
+    
