@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -98,7 +99,7 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-30 flex items-center justify-between px-2 sm:px-4 py-3 bg-background/80 backdrop-blur-md border-b w-full">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-muted/20 rounded-full">
+        <Button variant="ghost" size="icon" onClick={() => router.push('/profile')} className="text-foreground hover:bg-muted/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <h1 className="text-lg font-headline font-semibold text-foreground">Settings</h1>
@@ -182,3 +183,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+
