@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useRef } from 'react'; // Import React, useEffect, useRef
+import React, { useEffect, useRef, useState } from 'react'; // Import React, useEffect, useRef, useState
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap } from 'leaflet'; // Import L and LeafletMap type
@@ -60,9 +60,12 @@ interface EventMapProps {
 
 // Define the component logic
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
-  const mapRef = useRef<LeafletMap | null>(null); // Ref to store the map instance
+  const mapRef = useRef<LeafletMap | null>(null);
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
 
   useEffect(() => {
+    setIsClient(true); // Set to true once component has mounted on the client
+
     // Cleanup function: will be called when the component unmounts
     return () => {
       if (mapRef.current) {
@@ -70,9 +73,11 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
         mapRef.current = null;
       }
     };
-  }, []); // Empty dependency array means this effect runs once on mount and cleanup on unmount
+  }, []); // Empty dependency array ensures this effect runs once on mount and cleanup on unmount
 
-  if (typeof window === 'undefined') {
+  if (!isClient) {
+    // If not yet mounted on client, return null. 
+    // The `loading` prop of the `dynamic` import in MapPage will handle the visual placeholder.
     return null;
   }
 
@@ -115,7 +120,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   );
 }
 
-// Wrap the component with React.memo for performance optimization and to prevent re-initialization issues.
+// Wrap the component with React.memo for performance optimization.
 const EventMap = React.memo(EventMapComponent);
 
 export default EventMap;
