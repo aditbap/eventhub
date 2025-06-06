@@ -111,3 +111,14 @@ body {
     @apply font-headline;
   }
 }
+
+/* Leaflet custom icon styling */
+.custom-leaflet-div-icon {
+  background: transparent !important; /* Remove Leaflet's default white square background for divIcon */
+  border: none !important; /* Remove Leaflet's default border for divIcon */
+}
+
+.event-marker-svg {
+  /* Add any specific styling for the SVG if needed, e.g., drop shadow */
+  filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.2));
+}
