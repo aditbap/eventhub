@@ -50,7 +50,10 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
         eventId: event.id,
         eventName: event.title,
         eventDate: event.date,
+        eventTime: event.time,
         eventLocation: event.location,
+        eventImageUrl: event.imageUrl,
+        eventImageHint: event.imageHint,
       };
       
       await addDoc(collection(db, "userTickets"), {
@@ -155,3 +158,4 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
     </div>
   );
 }
+
