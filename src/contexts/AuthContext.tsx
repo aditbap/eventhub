@@ -12,9 +12,12 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore'; // Added updateDoc
+import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface User {
@@ -32,6 +35,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   updateUserName: (newName: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,7 +67,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!email || !password) {
       throw new Error("Email and password are required.");
     }
-    // setLoading(true); // Removed to prevent global loader during login if already on login page
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
@@ -77,8 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Login failed:", error);
       throw error; 
-    } finally {
-      // setLoading(false); // Auth state change will handle this
     }
   }, [setUser]); 
 
@@ -108,7 +109,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        // Navigation to /explore will be handled by the useEffect below once user state is set
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -144,8 +144,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
            await updateDoc(userDocRef, { 
             ...googleUserData,
-            displayName: firebaseUser.displayName || userDoc.data()?.displayName || null, // Keep existing if new is null
-            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null, // Keep existing if new is null
+            displayName: firebaseUser.displayName || userDoc.data()?.displayName || null,
+            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null,
           });
         }
         setUser({
@@ -154,7 +154,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
-        // Navigation to /explore will be handled by the useEffect below
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -184,20 +183,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setUser]); 
 
   const logout = useCallback(async () => {
-    // setLoading(true); // No need to set loading true, onAuthStateChanged will handle it.
     try {
       await signOut(auth);
-      setUser(null); // This will trigger onAuthStateChanged
+      setUser(null); 
       router.push('/login'); 
     } catch (error) {
       console.error("Logout failed:", error);
-    } finally {
-      // setLoading(false); // onAuthStateChanged sets loading to false
     }
   }, [router, setUser]); 
 
   const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
-    if (!auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
       return { success: false, error: { message: "No user logged in." } };
     }
     const trimmedNewName = newName.trim();
@@ -205,24 +202,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
   
-    const userToUpdate = auth.currentUser;
-    
     console.time("updateUserNameFirebase");
-    console.log(`updateUserName: Attempting to update name for UID: ${userToUpdate.uid} to "${trimmedNewName}"`);
+    console.log(`updateUserName: Attempting to update name for UID: ${currentUser.uid} to "${trimmedNewName}"`);
   
     try {
       console.log("updateUserName: Attempting to update Firebase Auth profile...");
-      await updateProfile(userToUpdate, { displayName: trimmedNewName });
+      await updateProfile(currentUser, { displayName: trimmedNewName });
       console.log("updateUserName: Firebase Auth profile updated successfully.");
   
-      const userDocRef = doc(db, "users", userToUpdate.uid);
-      console.log(`updateUserName: Checking Firestore document at users/${userToUpdate.uid}...`);
+      const userDocRef = doc(db, "users", currentUser.uid);
+      console.log(`updateUserName: Checking Firestore document at users/${currentUser.uid}...`);
       const docSnap = await getDoc(userDocRef);
   
       const userDataToUpdate = {
         displayName: trimmedNewName,
-        photoURL: userToUpdate.photoURL || null, // Ensure photoURL is consistent
-        email: userToUpdate.email || null, // Ensure email is consistent
+        photoURL: currentUser.photoURL || null, 
+        email: currentUser.email || null, 
         updatedAt: serverTimestamp()
       };
   
@@ -231,16 +226,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await updateDoc(userDocRef, userDataToUpdate);
         console.log("updateUserName: Firestore document updated successfully.");
       } else {
-        console.warn(`updateUserName: Firestore document users/${userToUpdate.uid} not found. Creating document.`);
+        console.warn(`updateUserName: Firestore document users/${currentUser.uid} not found. Creating document.`);
         await setDoc(userDocRef, {
-          uid: userToUpdate.uid,
-          ...userDataToUpdate, // includes new displayName, photoURL, email, updatedAt
-          createdAt: serverTimestamp() // Set createdAt only if creating new doc
+          uid: currentUser.uid,
+          ...userDataToUpdate,
+          createdAt: serverTimestamp() 
         });
         console.log("updateUserName: Firestore document created successfully.");
       }
       
-      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName, photoURL: userToUpdate.photoURL } : null);
+      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName, photoURL: currentUser.photoURL } : null);
       console.timeEnd("updateUserNameFirebase");
       return { success: true };
   
@@ -255,12 +250,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [setUser, db]); 
   
-  // Redirect unauthenticated users from protected pages
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
+      return { success: false, error: { message: "User not found or email is missing. Please log in again." } };
+    }
+
+    console.log(`changePassword: Attempting for user ${currentUser.email}`);
+    try {
+      console.log("changePassword: Creating credential...");
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      
+      console.log("changePassword: Attempting to re-authenticate...");
+      await reauthenticateWithCredential(currentUser, credential);
+      console.log("changePassword: Re-authentication successful.");
+      
+      console.log("changePassword: Attempting to update password...");
+      await updatePassword(currentUser, newPassword);
+      console.log("changePassword: Password updated successfully.");
+      
+      return { success: true };
+    } catch (err: any) {
+      console.warn(`AuthContext: Failed to change password. Error Code: ${err.code}, Message: ${err.message}`, err);
+      let errorMessage = "Could not change password. Please try again.";
+      if (err.code === 'auth/wrong-password') {
+        errorMessage = "The current password you entered is incorrect.";
+      } else if (err.code === 'auth/weak-password') {
+        errorMessage = "The new password is too weak. Please choose a stronger password (at least 6 characters).";
+      } else if (err.code === 'auth/requires-recent-login') {
+         errorMessage = "This operation is sensitive and requires recent authentication. Please log out and log back in before attempting to change your password.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      return { success: false, error: { message: errorMessage, code: err.code } };
+    }
+  }, []);
+
   useEffect(() => {
     const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings'];
-    // Add more specific protected paths if needed
-    // Example: /events/[eventId] is implicitly protected by /events parent
-
     const isProtectedPath = protectedAppPaths.some(p => pathname.startsWith(p));
 
     if (!loading && !user && isProtectedPath) {
@@ -268,9 +295,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-  // Redirect authenticated users from auth pages (like login, register) to explore
   useEffect(() => {
-    // '/new-password' is removed so logged-in users can access it from settings
     const authPagesForRedirect = ['/login', '/register', '/reset-password']; 
     if (!loading && user && (authPagesForRedirect.includes(pathname) || pathname === '/')) {
       router.replace('/explore');
@@ -279,12 +304,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName, changePassword }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
 export default AuthContext;
-
-    
