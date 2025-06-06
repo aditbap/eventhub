@@ -1,8 +1,9 @@
+
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, MapPin, UserCircle, Icon } from 'lucide-react';
+import { Compass, CalendarDays, Plus, MapPin, UserCircle, type Icon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -59,7 +60,7 @@ export function BottomNavigationBar() {
               aria-label={item.label}
             >
               <item.icon className={cn('h-6 w-6 mb-0.5', isActive ? 'text-primary' : '')} 
-                         fill={isActive ? 'currentColor' : 'none'} // Attempt to fill active icon
+                // fill prop removed: Lucide icons will use currentColor for stroke, set by text-primary
               />
               <span className="text-xs font-medium">{item.label}</span>
             </Link>
@@ -69,3 +70,4 @@ export function BottomNavigationBar() {
     </nav>
   );
 }
+
