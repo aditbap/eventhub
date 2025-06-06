@@ -73,7 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: userCredential.user.displayName,
           photoURL: userCredential.user.photoURL 
         });
-        // Navigation handled by useEffect
       }
     } catch (error) {
       console.error("Login failed:", error);
@@ -81,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, []); 
+  }, [setUser]); 
 
   const register = useCallback(async (name: string, email: string, password: string): Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }> => {
     if (!name || !email || !password) {
@@ -107,7 +106,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        // router.push('/explore'); // Removed explicit push here, relying on useEffect
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -145,7 +143,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
-        // Navigation handled by useEffect
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -198,23 +195,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
 
+    console.time("updateUserNameFirebase"); // Start timer
     try {
       const userDocRef = doc(db, "users", auth.currentUser.uid);
-      // Run Firebase Auth update and Firestore update concurrently
       await Promise.all([
         updateProfile(auth.currentUser, { displayName: trimmedNewName }),
         updateDoc(userDocRef, { displayName: trimmedNewName })
       ]);
       
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
+      console.timeEnd("updateUserNameFirebase"); // End timer and log duration
       return { success: true };
     } catch (err: any) {
+      console.timeEnd("updateUserNameFirebase"); // End timer even if error
       console.warn("AuthContext: Failed to update user name:", err);
       return { success: false, error: { message: err.message || "Could not update name." } };
     }
   }, [setUser]); 
   
-  // Effect to redirect to /login if unauthenticated on a protected page
   useEffect(() => {
     const allowedUnauthenticatedPaths = [
       '/login',
@@ -234,7 +232,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, loading, pathname, router]);
 
-  // Effect: Redirect to /explore if authenticated and on an auth page or root
   useEffect(() => {
     const authPages = ['/login', '/register', '/reset-password', '/new-password'];
     if (!loading && user && (authPages.includes(pathname) || pathname === '/')) {
@@ -251,3 +248,4 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export default AuthContext;
+
