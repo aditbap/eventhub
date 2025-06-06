@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -72,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: userCredential.user.displayName,
           photoURL: userCredential.user.photoURL 
         });
-        router.push('/explore');
+        // Navigation handled by useEffect
       }
     } catch (error) {
       console.error("Login failed:", error);
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        // router.push('/explore'); // Redirection handled by useEffect
+        // Navigation handled by useEffect
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -144,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
-        // router.push('/explore'); // Redirection handled by useEffect
+        // Navigation handled by useEffect
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -180,7 +181,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signOut(auth);
       setUser(null);
-      router.push('/login');
+      router.push('/login'); // Explicit navigation on logout
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
@@ -197,7 +198,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
 
-    setLoading(true);
+    // Do NOT set global loading for this specific operation
+    // setLoading(true); 
     try {
       // Update Firebase Auth profile
       await updateProfile(auth.currentUser, { displayName: trimmedNewName });
@@ -209,14 +211,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Update local user state
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
       
-      setLoading(false);
       return { success: true };
     } catch (err: any) {
       console.error("Failed to update user name:", err);
-      setLoading(false);
       return { success: false, error: { message: err.message || "Could not update name." } };
+    } finally {
+      // setLoading(false); // Ensure global loading is not set here either
     }
-  }, []);
+  }, []); // Dependencies: auth (stable), db (stable), setUser (stable from useState)
   
   // Effect to redirect to /login if unauthenticated on a protected page
   useEffect(() => {
@@ -225,24 +227,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       '/register',
       '/reset-password',
       '/new-password', 
-      '/' 
     ];
 
     if (
       !loading &&
       !user &&
-      !allowedUnauthenticatedPaths.some(p => pathname.startsWith(p)) &&
-      pathname !== '/' 
+      !pathname.startsWith('/_next/') && // Ignore Next.js internal paths
+      !allowedUnauthenticatedPaths.some(p => pathname === p || pathname.startsWith(p + '/')) &&
+      pathname !== '/' // Allow access to the root splash page
     ) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [user, loading, pathname, router]);
 
-  // NEW Effect: Redirect to /explore if authenticated and on an auth page
+  // Effect: Redirect to /explore if authenticated and on an auth page or root
   useEffect(() => {
     const authPages = ['/login', '/register', '/reset-password', '/new-password'];
-    if (!loading && user && authPages.includes(pathname)) {
-      router.replace('/explore'); // Use replace to prevent back navigation to auth page
+    if (!loading && user && (authPages.includes(pathname) || pathname === '/')) {
+      router.replace('/explore'); 
     }
   }, [user, loading, pathname, router]);
 
