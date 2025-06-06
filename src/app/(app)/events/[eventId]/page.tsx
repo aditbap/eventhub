@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -50,10 +49,10 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
         eventId: event.id,
         eventName: event.title,
         eventDate: event.date,
-        eventTime: event.time,
+        eventTime: event.time || null,
         eventLocation: event.location,
-        eventImageUrl: event.imageUrl,
-        eventImageHint: event.imageHint,
+        eventImageUrl: event.imageUrl || null,
+        eventImageHint: event.imageHint || null,
       };
       
       await addDoc(collection(db, "userTickets"), {
@@ -158,4 +157,3 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
     </div>
   );
 }
-

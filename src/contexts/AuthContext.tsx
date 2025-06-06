@@ -106,6 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
+        // router.push('/explore'); // Moved to useEffect
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -131,9 +132,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!userDoc.exists()) {
           await setDoc(userDocRef, {
             uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName,
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL,
+            displayName: firebaseUser.displayName || null,
+            email: firebaseUser.email || null,
+            photoURL: firebaseUser.photoURL || null,
             createdAt: serverTimestamp(),
           });
         }
@@ -143,6 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
+        // router.push('/explore'); // Moved to useEffect
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -195,7 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
 
-    console.time("updateUserNameFirebase"); // Start timer
+    console.time("updateUserNameFirebase");
     try {
       const userDocRef = doc(db, "users", auth.currentUser.uid);
       await Promise.all([
@@ -204,10 +206,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ]);
       
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
-      console.timeEnd("updateUserNameFirebase"); // End timer and log duration
+      console.timeEnd("updateUserNameFirebase");
       return { success: true };
     } catch (err: any) {
-      console.timeEnd("updateUserNameFirebase"); // End timer even if error
+      console.timeEnd("updateUserNameFirebase");
       console.warn("AuthContext: Failed to update user name:", err);
       return { success: false, error: { message: err.message || "Could not update name." } };
     }
@@ -248,4 +250,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export default AuthContext;
-
