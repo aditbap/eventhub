@@ -94,8 +94,7 @@ export default function ExplorePage() {
       const eventDate = new Date(event.date);
       // eventDate is already at midnight local time due to "YYYY-MM-DD" format
       return eventDate >= today &&
-             eventDate <= sevenDaysFromNowTarget &&
-             event.attendees && event.attendees.length > 0;
+             eventDate <= sevenDaysFromNowTarget;
     })
     .slice(0, 5);
 
