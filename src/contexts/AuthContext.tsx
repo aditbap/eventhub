@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { auth, db } from '@/lib/firebase'; // Using REAL Firebase
+import { auth, db, storage } from '@/lib/firebase'; // Using REAL Firebase, Added storage
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -18,6 +18,7 @@ import {
   type User as FirebaseUser 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // Added for storage
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface User {
@@ -25,8 +26,6 @@ export interface User {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  // birthDate and gender are not part of the core User object in context for now
-  // They are fetched and managed in the SettingsPage directly or via specific update functions
 }
 
 interface AuthContextType {
@@ -40,6 +39,7 @@ interface AuthContextType {
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   updateUserBirthDate: (newBirthDate: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   updateUserGender: (newGender: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
+  updateUserProfilePicture: (file: File) => Promise<{ success: boolean, photoURL?: string, error?: { message: string, code?: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
            await updateDoc(userDocRef, { 
             ...googleUserData,
             displayName: firebaseUser.displayName || userDoc.data()?.displayName || null,
-            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null,
+            photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null, // Ensure photoURL is updated or kept
             updatedAt: serverTimestamp(),
           });
         }
@@ -208,8 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     console.log(`updateUserName: Attempting to update name for UID: ${currentUser.uid} to "${trimmedNewName}"`);
-    console.time("updateUserNameFirebase");
-
+    
     try {
       console.log("updateUserName: Attempting to update Firebase Auth profile...");
       const authUpdatePromise = updateProfile(currentUser, { displayName: trimmedNewName });
@@ -222,20 +221,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const firestoreData = {
         displayName: trimmedNewName,
-        photoURL: currentUser.photoURL || null,
-        email: currentUser.email || null,
         updatedAt: serverTimestamp()
       };
-
+      
       let firestoreUpdatePromise;
       if (docSnap.exists()) {
         console.log("updateUserName: Firestore document exists. Updating...");
         firestoreUpdatePromise = updateDoc(userDocRef, firestoreData);
       } else {
-        console.warn(`updateUserName: Firestore document users/${currentUser.uid} not found. Creating document.`);
+        console.warn(`updateUserName: Firestore document users/${currentUser.uid} not found. Creating document with new name.`);
         firestoreUpdatePromise = setDoc(userDocRef, {
-          ...firestoreData,
-          uid: currentUser.uid, // Ensure UID is set on creation
+          uid: currentUser.uid,
+          email: currentUser.email || null,
+          photoURL: currentUser.photoURL || null,
+          ...firestoreData, // includes displayName
           createdAt: serverTimestamp()
         });
       }
@@ -244,13 +243,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await Promise.all([authUpdatePromise, firestoreUpdatePromise]);
       console.log("updateUserName: Both Firebase Auth and Firestore updates completed.");
       
-      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName, photoURL: currentUser.photoURL } : null);
+      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
       
-      console.timeEnd("updateUserNameFirebase");
       return { success: true };
 
     } catch (err: any) {
-      console.timeEnd("updateUserNameFirebase");
       console.warn(`AuthContext: Failed to update user name. Error Code: ${err.code}, Message: ${err.message}`, err);
       let errorMessage = "Could not update name. Please try again.";
       if (err.message) {
@@ -266,19 +263,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "User not found or email is missing. Please log in again." } };
     }
 
-    console.log(`changePassword: Attempting for user ${currentUser.email}`);
     try {
-      console.log("changePassword: Creating credential...");
       const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
-      
-      console.log("changePassword: Attempting to re-authenticate...");
       await reauthenticateWithCredential(currentUser, credential);
-      console.log("changePassword: Re-authentication successful.");
-      
-      console.log("changePassword: Attempting to update password...");
       await updatePassword(currentUser, newPassword);
-      console.log("changePassword: Password updated successfully.");
-      
       return { success: true };
     } catch (err: any) {
       console.warn(`AuthContext: Failed to change password. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -302,7 +290,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "No user logged in." } };
     }
     
-    console.log(`updateUserBirthDate: Attempting to update birth date for UID: ${currentUser.uid} to "${newBirthDate}"`);
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
       const docSnap = await getDoc(userDocRef);
@@ -314,18 +301,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (docSnap.exists()) {
         await updateDoc(userDocRef, birthDateData);
-        console.log("updateUserBirthDate: Firestore document updated successfully.");
       } else {
-        console.warn(`updateUserBirthDate: Firestore document users/${currentUser.uid} not found. Creating document with birth date.`);
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           displayName: currentUser.displayName || null,
           email: currentUser.email || null,
           photoURL: currentUser.photoURL || null,
           ...birthDateData,
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(), // Also set on creation
         });
-        console.log("updateUserBirthDate: Firestore document created with birth date successfully.");
       }
       return { success: true };
     } catch (err: any) {
@@ -340,7 +325,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "No user logged in." } };
     }
     
-    console.log(`updateUserGender: Attempting to update gender for UID: ${currentUser.uid} to "${newGender}"`);
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
       const docSnap = await getDoc(userDocRef);
@@ -352,18 +336,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (docSnap.exists()) {
         await updateDoc(userDocRef, genderData);
-        console.log("updateUserGender: Firestore document updated successfully.");
       } else {
-        console.warn(`updateUserGender: Firestore document users/${currentUser.uid} not found. Creating document with gender.`);
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           displayName: currentUser.displayName || null,
           email: currentUser.email || null,
           photoURL: currentUser.photoURL || null,
           ...genderData,
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(), // Also set on creation
         });
-        console.log("updateUserGender: Firestore document created with gender successfully.");
       }
       return { success: true };
     } catch (err: any) {
@@ -372,9 +354,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [db]);
 
+  const updateUserProfilePicture = useCallback(async (file: File): Promise<{ success: boolean, photoURL?: string, error?: { message: string, code?: string } }> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { success: false, error: { message: "No user logged in." } };
+    }
+    if (!file) {
+      return { success: false, error: { message: "No file selected." } };
+    }
+
+    const filePath = `profile_pictures/${currentUser.uid}/${file.name}`; // Consider a more unique name or fixed name
+    const fileRef = storageRef(storage, filePath);
+
+    console.log(`updateUserProfilePicture: Uploading to ${filePath}`);
+    try {
+      const snapshot = await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      console.log("updateUserProfilePicture: File uploaded, URL:", downloadURL);
+
+      const authUpdatePromise = updateProfile(currentUser, { photoURL: downloadURL });
+      
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const docSnap = await getDoc(userDocRef);
+      let firestorePromise;
+      const firestoreData = {
+        photoURL: downloadURL,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (docSnap.exists()) {
+        console.log("updateUserProfilePicture: Updating Firestore document for photoURL.");
+        firestorePromise = updateDoc(userDocRef, firestoreData);
+      } else {
+        console.warn(`updateUserProfilePicture: User document for UID ${currentUser.uid} not found. Creating with new photoURL.`);
+        firestorePromise = setDoc(userDocRef, {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || null,
+          email: currentUser.email || null,
+          createdAt: serverTimestamp(),
+          ...firestoreData, // includes photoURL and updatedAt
+        });
+      }
+
+      await Promise.all([authUpdatePromise, firestorePromise]);
+      
+      setUser(prevUser => prevUser ? { ...prevUser, photoURL: downloadURL } : null);
+      return { success: true, photoURL: downloadURL };
+
+    } catch (err: any)
+		{
+		  let detailedErrorMessage = "Could not update profile picture.";
+		  if (err instanceof Error) {
+			detailedErrorMessage = err.message;
+		  }
+		  // Check for specific Firebase Storage error codes
+		  if (typeof err === 'object' && err && 'code' in err) {
+			const firebaseError = err as { code: string; message: string };
+			console.warn(`AuthContext: Failed to update profile picture. Code: ${firebaseError.code}, Message: ${firebaseError.message}`, firebaseError);
+			if (firebaseError.code === 'storage/unauthorized') {
+			  detailedErrorMessage = "Permission denied. Please check Firebase Storage rules.";
+			} else if (firebaseError.code === 'storage/object-not-found') {
+			  detailedErrorMessage = "File not found during upload. This is unexpected.";
+			} else if (firebaseError.code === 'storage/canceled') {
+			  detailedErrorMessage = "Upload cancelled.";
+			}
+		  } else {
+			console.warn(`AuthContext: Failed to update profile picture. Unknown error:`, err);
+		  }
+		  return { success: false, error: { message: detailedErrorMessage, code: (err as any)?.code } };
+		}
+  }, [db]);
+
 
   useEffect(() => {
-    const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings'];
+    const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings', '/new-password'];
     const isProtectedPath = protectedAppPaths.some(p => pathname.startsWith(p));
 
     if (!loading && !user && isProtectedPath) {
@@ -383,7 +436,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   useEffect(() => {
-    // Pages that authenticated users should be redirected away from
     const authPagesForRedirect = ['/login', '/register', '/reset-password']; 
     
     if (!loading && user && (authPagesForRedirect.includes(pathname) || pathname === '/')) {
@@ -393,7 +445,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName, changePassword, updateUserBirthDate, updateUserGender }}>
+    <AuthContext.Provider value={{ 
+        user, 
+        loading, 
+        login, 
+        register, 
+        logout, 
+        loginWithGoogle, 
+        updateUserName, 
+        changePassword, 
+        updateUserBirthDate, 
+        updateUserGender,
+        updateUserProfilePicture 
+      }}>
       {children}
     </AuthContext.Provider>
   );

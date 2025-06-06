@@ -42,15 +42,14 @@ export default function ProfilePage() {
               eventId: data.eventId,
               eventName: data.eventName,
               eventDate: data.eventDate,
-              eventTime: data.eventTime, // Added eventTime
+              eventTime: data.eventTime, 
               eventLocation: data.eventLocation,
-              eventImageUrl: data.eventImageUrl, // Added eventImageUrl
+              eventImageUrl: data.eventImageUrl, 
               eventImageHint: data.eventImageHint,
               qrCodeUrl: data.qrCodeUrl, 
               purchaseDate: purchaseDateStr,
             } as Ticket;
           });
-          // Sort tickets by eventDate, newest first
           userTickets.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
           setTickets(userTickets);
 
@@ -72,23 +71,21 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-100/30 via-emerald-50/20 to-background">
-      {/* Header */}
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-transparent w-full">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-white/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <h1 className="text-xl font-headline font-semibold text-foreground">Profile</h1>
-        <div className="w-9 h-9"></div> {/* Spacer for centering title */}
+        <div className="w-9 h-9"></div> 
       </header>
 
-      {/* User Info Section */}
       <div className="flex flex-col items-center justify-center pt-2 pb-8 px-4">
         <div className="relative mb-3">
           <Avatar className="h-28 w-28 border-4 border-white shadow-md">
             <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar"/>
             <AvatarFallback className="text-3xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
-          <Button variant="outline" size="icon" className="absolute -bottom-1 -right-1 bg-background hover:bg-muted border-2 border-background h-8 w-8 rounded-full shadow-md">
+          <Button variant="outline" size="icon" className="absolute -bottom-1 -right-1 bg-background hover:bg-muted border-2 border-background h-8 w-8 rounded-full shadow-md" onClick={() => router.push('/settings')}>
             <Pencil className="h-4 w-4 text-primary" />
           </Button>
         </div>
@@ -102,8 +99,7 @@ export default function ProfilePage() {
         </Button>
       </div>
 
-      {/* My Tickets Section */}
-      <section className="px-4 pb-20"> {/* Added pb-20 for bottom nav */}
+      <section className="px-4 pb-20"> 
         <div className="flex items-center mb-4">
           <TicketIconLucide className="h-6 w-6 mr-2 text-primary"/>
           <h2 className="text-xl font-headline font-semibold text-foreground">My Ticket</h2>
@@ -129,4 +125,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

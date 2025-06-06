@@ -1,18 +1,18 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Plus, Loader2, LogOut, ShieldAlert, CheckCircle, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Camera, Loader2, LogOut, ShieldAlert, CheckCircle, CalendarIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { ChangeNameDialog } from '@/components/settings/ChangeNameDialog';
 import { ChangeBirthDateDialog } from '@/components/settings/ChangeBirthDateDialog';
-import { ChangeGenderDialog } from '@/components/settings/ChangeGenderDialog'; // Import new dialog
+import { ChangeGenderDialog } from '@/components/settings/ChangeGenderDialog';
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -53,17 +53,19 @@ const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, la
 
 
 export default function SettingsPage() {
-  const { user, loading, logout, updateUserName, updateUserBirthDate, updateUserGender } = useAuth();
+  const { user, loading, logout, updateUserName, updateUserBirthDate, updateUserGender, updateUserProfilePicture } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isChangeNameDialogOpen, setIsChangeNameDialogOpen] = useState(false);
   const [isChangeBirthDateDialogOpen, setIsChangeBirthDateDialogOpen] = useState(false);
-  const [isChangeGenderDialogOpen, setIsChangeGenderDialogOpen] = useState(false); // State for gender dialog
+  const [isChangeGenderDialogOpen, setIsChangeGenderDialogOpen] = useState(false);
   const [currentBirthDate, setCurrentBirthDate] = useState('N/A');
-  const [currentGender, setCurrentGender] = useState('N/A'); // State for current gender
+  const [currentGender, setCurrentGender] = useState('N/A');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
-  // Fetch user-specific data (birthDate, gender) from Firestore
+
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
@@ -97,6 +99,38 @@ export default function SettingsPage() {
     router.replace('/login');
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
+
+  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && user) {
+      setIsUploadingPicture(true);
+      updateUserProfilePicture(file)
+        .then(result => {
+          if (result.success && result.photoURL) {
+            toast({
+              title: "Profile Picture Updated",
+              description: "Your new profile picture has been set.",
+              action: <CheckCircle className="h-5 w-5 text-green-500" />,
+            });
+          } else {
+            throw new Error(result.error?.message || "Failed to update profile picture.");
+          }
+        })
+        .catch(error => {
+          toast({
+            title: "Upload Failed",
+            description: error.message || "Could not upload your profile picture.",
+            variant: "destructive",
+          });
+        })
+        .finally(() => {
+          setIsUploadingPicture(false);
+          if(fileInputRef.current) { 
+            fileInputRef.current.value = "";
+          }
+        });
+    }
+  };
 
   const accountItems: SettingsItemProps[] = [
     { 
@@ -177,15 +211,33 @@ export default function SettingsPage() {
         <h1 className="text-lg font-headline font-semibold text-foreground">Settings</h1>
         <div className="w-9 h-9"></div> 
       </header>
+      
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleProfilePictureChange}
+        accept="image/png, image/jpeg, image/gif"
+        style={{ display: 'none' }}
+        disabled={isUploadingPicture}
+      />
 
       <div className="flex flex-col items-center pt-6 pb-6 px-4">
         <Avatar className="h-24 w-24 mb-4 border-2 border-border shadow-sm">
-          <AvatarImage src={user.photoURL || `https://placehold.co/100x100.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="dog avatar" />
+          <AvatarImage src={user.photoURL || `https://placehold.co/100x100.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar settings" />
           <AvatarFallback className="text-3xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
         </Avatar>
-        <Button variant="outline" className="rounded-full bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 text-sm font-medium border-none shadow-sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Change Profile Picture
+        <Button 
+          variant="outline" 
+          className="rounded-full bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 text-sm font-medium border-none shadow-sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploadingPicture || loading}
+        >
+          {isUploadingPicture ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Camera className="h-4 w-4 mr-2" />
+          )}
+          {isUploadingPicture ? 'Uploading...' : 'Change Profile Picture'}
         </Button>
       </div>
 
