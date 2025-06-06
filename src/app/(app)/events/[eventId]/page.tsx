@@ -6,7 +6,7 @@ import type { Event, Ticket } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, CheckCircle, ArrowLeft } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft } from 'lucide-react'; // Removed CheckCircle
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -67,8 +67,12 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
 
       toast({
         title: '🎉 Ticket Acquired!',
-        description: `You've successfully got a ticket for ${event.title}. Find it in your Profile.`,
-        action: <CheckCircle className="h-5 w-5 text-green-500" />,
+        description: `You've successfully got a ticket for ${event.title}.`,
+        action: (
+          <Button variant="outline" size="sm" onClick={() => router.push('/profile')}>
+            View Ticket
+          </Button>
+        ),
       });
     } catch (error) {
       console.error('Error getting ticket:', error);
@@ -200,3 +204,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
+
