@@ -4,8 +4,7 @@
 import React, { useEffect, useRef, useState, memo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L, { type Map as LeafletMap } from 'leaflet';
-import type { Icon as LeafletIconType } from 'leaflet';
+import L, { type Map as LeafletMap, type Icon as LeafletIconType } from 'leaflet';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { Event } from '@/types';
@@ -60,47 +59,49 @@ let globalInstanceCounter = 0; // Module-level counter for unique IDs
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  
-  // Unique key for this specific component instance's MapContainer.
+  // Create a unique key for this specific component instance's MapContainer.
   // This ensures that if EventMapComponent is remounted (e.g., by StrictMode),
   // the MapContainer gets a new key, forcing React to create a new DOM element for it.
-  const [mapContainerKey] = useState(() => {
-    const newKey = `map-container-${globalInstanceCounter++}-${Date.now()}`;
-    console.log(`EventMapComponent: Instance created. mapContainerKey: ${newKey}`);
-    return newKey;
-  });
-
-  // State to delay rendering MapContainer until after this component instance's first "true" effect runs.
+  const [mapContainerKey] = useState(() => `map-container-${globalInstanceCounter++}-${Date.now()}`);
   const [clientRenderComplete, setClientRenderComplete] = useState(false);
 
-  useEffect(() => {
-    // This effect runs once after the component instance has truly mounted on the client.
-    console.log(`EventMapComponent (${mapContainerKey}): useEffect[] mount. Setting clientRenderComplete = true.`);
-    setClientRenderComplete(true);
+  console.log(`EventMapComponent (${mapContainerKey}): Instance created/rendered. clientRenderComplete: ${clientRenderComplete}`);
 
-    // This cleanup function runs when this *specific instance* of EventMapComponent unmounts.
+  useEffect(() => {
+    console.log(`EventMapComponent (${mapContainerKey}): useEffect[] mount. Initializing timeout to set clientRenderComplete.`);
+    
+    // Defer setting clientRenderComplete to true. This helps ensure that any cleanup
+    // from a previous instance (especially in StrictMode) has a chance to complete.
+    const timerId = setTimeout(() => {
+      console.log(`EventMapComponent (${mapContainerKey}): Timeout finished. Setting clientRenderComplete = true.`);
+      setClientRenderComplete(true);
+    }, 0); // A 0ms timeout defers execution to the next event loop cycle. Increase if problems persist (e.g., to 50).
+
+    // This cleanup function runs when THIS SPECIFIC EventMapComponent instance unmounts.
     return () => {
-      console.log(`EventMapComponent (${mapContainerKey}): useEffect[] cleanup. mapRef.current: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+      console.log(`EventMapComponent (${mapContainerKey}): useEffect[] cleanup. Clearing timeout. Attempting to remove map instance: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+      clearTimeout(timerId); // Clear the timeout if the component unmounts before it fires.
       if (mapRef.current) {
-        const mapId = (mapRef.current as any)._leaflet_id;
-        console.log(`EventMapComponent (${mapContainerKey}): Removing map instance ${mapId}`);
-        mapRef.current.remove();
-        mapRef.current = null; // Clear the ref
+        mapRef.current.remove(); // Remove the Leaflet map instance.
+        mapRef.current = null;   // Nullify the ref.
+        console.log(`EventMapComponent (${mapContainerKey}): Map instance removed and ref set to null.`);
       } else {
-        console.log(`EventMapComponent (${mapContainerKey}): No map instance to remove in cleanup.`);
+        console.log(`EventMapComponent (${mapContainerKey}): No map instance in ref to remove during cleanup.`);
       }
     };
-  }, []); // Empty dependency array: effect runs once on mount, cleanup once on unmount for this instance.
+  }, []); // Empty dependency array means this effect runs once on mount and cleanup once on unmount FOR THIS INSTANCE.
 
   if (!clientRenderComplete) {
-    console.log(`EventMapComponent (${mapContainerKey}): Initial render phase, clientRenderComplete is false. Returning null.`);
+    console.log(`EventMapComponent (${mapContainerKey}): clientRenderComplete is false. Returning null (placeholder or loading state).`);
+    // While clientRenderComplete is false, return null or a loading indicator.
+    // The dynamic import's loading prop in MapPage.tsx will handle the visual loading state.
     return null; 
   }
 
   console.log(`EventMapComponent (${mapContainerKey}): clientRenderComplete is true. Rendering MapContainer. mapRef.current before MapContainer render: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
   return (
     <MapContainer
-      key={mapContainerKey} // This key is critical. If EventMapComponent remounts, this new key forces a new DOM element.
+      key={mapContainerKey} // This key is critical. If EventMapComponent remounts (e.g. by StrictMode), this new key forces a new DOM element & MapContainer instance.
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
@@ -108,14 +109,8 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
         const newMapId = (mapInstance as any)._leaflet_id;
-        console.log(`EventMapComponent (${mapContainerKey}): MapContainer (key: ${mapContainerKey}) 'whenCreated' callback. New Map ID: ${newMapId}. Current mapRef: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
-        
-        // If mapRef.current already exists from a previous render of *this same instance* (which shouldn't happen with this logic),
-        // or if it somehow points to an old map, clear it.
-        // However, the primary defense is the key forcing a new MapContainer and the useEffect cleanup removing the old instance.
-        if (mapRef.current && mapRef.current !== mapInstance) {
-             console.warn(`EventMapComponent (${mapContainerKey}): 'whenCreated' - mapRef.current was already set to a different map instance (${(mapRef.current as any)._leaflet_id}). This is unexpected. Overwriting.`);
-        }
+        // This callback is for the MapContainer instance associated with the current mapContainerKey.
+        console.log(`EventMapComponent (${mapContainerKey}): MapContainer (key: ${mapContainerKey}) 'whenCreated' callback. New Map ID: ${newMapId}. Current mapRef (before assignment): ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
         mapRef.current = mapInstance;
       }}
     >
@@ -125,7 +120,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id} // Use event.id for marker key (stable)
+          key={event.id} // Use event.id for marker key (stable across renders for the same event)
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
