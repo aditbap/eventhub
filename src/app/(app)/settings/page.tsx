@@ -1,17 +1,21 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Plus, Loader2, LogOut, ShieldAlert, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Plus, Loader2, LogOut, ShieldAlert, CheckCircle, CalendarIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { ChangeNameDialog } from '@/components/settings/ChangeNameDialog';
+import { ChangeBirthDateDialog } from '@/components/settings/ChangeBirthDateDialog'; // Import new dialog
 import { useToast } from "@/hooks/use-toast";
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
 
 interface SettingsItemProps {
   icon: React.ElementType;
@@ -48,17 +52,44 @@ const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, la
 
 
 export default function SettingsPage() {
-  const { user, loading, logout, updateUserName } = useAuth();
+  const { user, loading, logout, updateUserName, updateUserBirthDate } = useAuth(); // Added updateUserBirthDate
   const router = useRouter();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isChangeNameDialogOpen, setIsChangeNameDialogOpen] = useState(false);
+  const [isChangeBirthDateDialogOpen, setIsChangeBirthDateDialogOpen] = useState(false); // State for new dialog
+  const [currentBirthDate, setCurrentBirthDate] = useState('N/A'); // State for current birth date
+
+  // Fetch birth date when user is available
+  useEffect(() => {
+    const fetchUserBirthDate = async () => {
+      if (user) {
+        try {
+          const userDocRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists() && docSnap.data()?.birthDate) {
+            setCurrentBirthDate(docSnap.data()?.birthDate);
+          } else {
+            setCurrentBirthDate('N/A');
+          }
+        } catch (error) {
+          console.error("Error fetching birth date:", error);
+          setCurrentBirthDate('N/A');
+        }
+      }
+    };
+    fetchUserBirthDate();
+  }, [user]);
+
 
   if (loading) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
   if (!user) { 
+    // This case should ideally be handled by AppLayout redirecting to /login
+    // but as a fallback or if routing is slow:
+    router.replace('/login'); // Ensure redirect if user is null post-loading
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -71,8 +102,13 @@ export default function SettingsPage() {
     }, 
     { icon: Mail, label: 'Email', value: user.email || 'N/A' }, 
     { icon: Lock, label: 'Change Password', value: '••••••••••••', href: '/new-password' }, 
-    { icon: Phone, label: 'Day of birth', value: '02/02/2005', href: '#' }, 
-    { icon: GenderIcon, label: 'Gender', value: 'Male', href: '#' }, 
+    { 
+      icon: CalendarIcon, // Changed icon
+      label: 'Day of birth', 
+      value: currentBirthDate, // Use state for value
+      onClick: () => setIsChangeBirthDateDialogOpen(true) // Add onClick
+    }, 
+    { icon: GenderIcon, label: 'Gender', value: 'Male', href: '#' }, // Placeholder, can be functionalized
   ];
 
   const handleDeleteAccountConfirm = () => {
@@ -89,10 +125,22 @@ export default function SettingsPage() {
         description: "Your display name has been successfully updated.",
         action: <CheckCircle className="h-5 w-5 text-green-500" />,
       });
-      // Dialog will close itself on successful onSave()
     } else {
-      // Let the dialog handle displaying its internal error by throwing it
       throw new Error(result.error?.message || "Failed to update name. Please try again.");
+    }
+  };
+
+  const handleSaveBirthDate = async (newBirthDate: string) => {
+    const result = await updateUserBirthDate(newBirthDate);
+    if (result.success) {
+      setCurrentBirthDate(newBirthDate); // Update local state for display
+      toast({
+        title: "Birth Date Updated",
+        description: "Your birth date has been successfully updated.",
+        action: <CheckCircle className="h-5 w-5 text-green-500" />,
+      });
+    } else {
+      throw new Error(result.error?.message || "Failed to update birth date. Please try again.");
     }
   };
 
@@ -180,7 +228,13 @@ export default function SettingsPage() {
         currentName={user.displayName || ''}
         onSave={handleSaveName}
       />
+      
+      <ChangeBirthDateDialog
+        isOpen={isChangeBirthDateDialogOpen}
+        onClose={() => setIsChangeBirthDateDialogOpen(false)}
+        currentBirthDate={currentBirthDate === 'N/A' ? '' : currentBirthDate} // Pass empty string if N/A
+        onSave={handleSaveBirthDate}
+      />
     </div>
   );
 }
-
