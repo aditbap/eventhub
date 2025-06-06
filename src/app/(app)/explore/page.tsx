@@ -82,13 +82,27 @@ export default function ExplorePage() {
     setFilteredEvents(eventsToFilter);
   }, [allEvents, searchQuery, currentCategory]);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of today
+
+  const sevenDaysFromNowTarget = new Date();
+  sevenDaysFromNowTarget.setDate(sevenDaysFromNowTarget.getDate() + 7); // Date 7 days from today
+  sevenDaysFromNowTarget.setHours(23, 59, 59, 999); // Normalize to end of the 7th day from today
+
   const upcomingEvents = filteredEvents
-    .filter(e => new Date(e.date) >= new Date() && e.attendees && e.attendees.length > 0)
+    .filter(event => {
+      const eventDate = new Date(event.date);
+      // eventDate is already at midnight local time due to "YYYY-MM-DD" format
+      return eventDate >= today &&
+             eventDate <= sevenDaysFromNowTarget &&
+             event.attendees && event.attendees.length > 0;
+    })
     .slice(0, 5);
 
   const nearYouEvents = filteredEvents
     .filter(e => {
-      const isUpcoming = new Date(e.date) >= new Date();
+      const eventDate = new Date(e.date);
+      const isUpcoming = eventDate >= today; // Check if event is today or in the future
       const hasFewOrNoAttendees = !e.attendees || e.attendees.length === 0;
       const isLocationMatch = userLocation && e.location && e.location.toLowerCase().includes(userLocation.toLowerCase());
       return isUpcoming && isLocationMatch && hasFewOrNoAttendees; // Prioritize location match for new/less crowded events
