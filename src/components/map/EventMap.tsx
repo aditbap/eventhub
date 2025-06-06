@@ -56,67 +56,60 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Module-level counter to help ensure unique keys across HMR or other scenarios if needed, though Date.now + random should suffice.
-let eventMapInstanceCounter = 0;
+let eventMapInstanceCounter = 0; 
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
-  // Generate a unique key for the MapContainer for each instance of EventMapComponent.
-  // This is crucial for React StrictMode, which remounts components to detect issues.
-  // A new key forces React to create a new DOM element for MapContainer.
+  const mapRef = useRef<LeafletMap | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
   const [mapContainerKey] = useState(() => {
     eventMapInstanceCounter++;
-    const key = `map-container-instance-${eventMapInstanceCounter}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    console.log(`[EventMapComponent INSTANCE CREATED] Generated mapContainerKey: ${key}`);
+    const key = `map-instance-key-${eventMapInstanceCounter}-${Date.now()}`;
+    console.log(`[EventMapComponent constructor-like] Generated mapContainerKey: ${key}`);
     return key;
   });
 
-  const mapRef = useRef<LeafletMap | null>(null);
-
   useEffect(() => {
-    // This effect is tied to the lifecycle of this EventMapComponent instance
-    // (and its specific mapContainerKey).
-    console.log(`[EventMapComponent key: ${mapContainerKey}] Effect: Setup. Current map in ref: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+    console.log(`[EventMapComponent key: ${mapContainerKey}] useEffect: Running. Setting isMounted = true.`);
+    setIsMounted(true); // Enable rendering of MapContainer
 
-    // The cleanup function will run when this EventMapComponent instance unmounts.
+    // Cleanup function for this specific EventMapComponent instance
     return () => {
-      console.log(`[EventMapComponent key: ${mapContainerKey}] Effect: Cleanup. Attempting to remove map. Current map in ref: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+      console.log(`[EventMapComponent key: ${mapContainerKey}] useEffect cleanup: Running. Current mapRef ID: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
       if (mapRef.current) {
         const mapIdToRemove = (mapRef.current as any)._leaflet_id;
-        console.log(`[EventMapComponent key: ${mapContainerKey}] Effect: Removing Leaflet map instance ID: ${mapIdToRemove}`);
+        console.log(`[EventMapComponent key: ${mapContainerKey}]   Removing map instance ID: ${mapIdToRemove}`);
         mapRef.current.remove();
-        mapRef.current = null; // Important: clear the ref
-        console.log(`[EventMapComponent key: ${mapContainerKey}] Effect: Leaflet map instance ID: ${mapIdToRemove} removed and ref nulled.`);
+        mapRef.current = null;
+        console.log(`[EventMapComponent key: ${mapContainerKey}]   Map instance ID ${mapIdToRemove} removed and ref nulled.`);
       } else {
-        console.log(`[EventMapComponent key: ${mapContainerKey}] Effect: Cleanup - mapRef.current was already null. No map to remove.`);
+        console.log(`[EventMapComponent key: ${mapContainerKey}]   Cleanup: mapRef.current was already null. No map to remove.`);
       }
+      // setIsMounted(false); // This component instance is unmounting, so its state doesn't matter for itself.
     };
-  }, [mapContainerKey]); // mapContainerKey is stable for the lifetime of this component instance.
+  }, [mapContainerKey]); // mapContainerKey is stable for THIS instance, so effect runs once on mount, cleanup on unmount.
 
-  console.log(`[EventMapComponent key: ${mapContainerKey}] Rendering. Map ref is currently: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+  if (!isMounted) {
+    console.log(`[EventMapComponent key: ${mapContainerKey}] Render: isMounted is false. Returning null (or placeholder).`);
+    return null; // Or a loading spinner, but MapPage's dynamic import already has a loader
+  }
 
+  console.log(`[EventMapComponent key: ${mapContainerKey}] Render: isMounted is true. Rendering <MapContainer>.`);
   return (
     <MapContainer
-      key={mapContainerKey} // This key forces a new DOM element if EventMapComponent remounts.
+      key={mapContainerKey} // CRUCIAL: Forces React to create new DOM & MapContainer instance if EventMapComponent is remounted
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
-        // This callback is from react-leaflet when the Leaflet map is internally ready.
         const mapId = (mapInstance as any)._leaflet_id;
-        console.log(`[MapContainer key: ${mapContainerKey}] whenCreated: Leaflet map instance ID: ${mapId} created.`);
-        
-        // Defensive check: if mapRef.current is already set and it's a different map instance,
-        // it implies whenCreated might have been called multiple times for the same MapContainer key,
-        // or a logic error. This should ideally not happen with a stable key per EventMapComponent instance.
-        if (mapRef.current && mapRef.current !== mapInstance) {
-            console.warn(`[MapContainer key: ${mapContainerKey}] whenCreated: mapRef.current was already set to a different map instance (ID: ${(mapRef.current as any)._leaflet_id}). Overwriting with new instance (ID: ${mapId}). This is unusual.`);
-            // mapRef.current.remove(); // Consider if the old one needs explicit removal here, though useEffect cleanup should handle its own.
+        console.log(`[MapContainer for key: ${mapContainerKey}] whenCreated: Leaflet map instance ID: ${mapId}. Assigning to mapRef.`);
+        // Only assign if mapRef is not already pointing to this exact instance (though key should prevent this)
+        if (mapRef.current !== mapInstance) {
+             mapRef.current = mapInstance;
         }
-        
-        mapRef.current = mapInstance;
-        console.log(`[MapContainer key: ${mapContainerKey}] whenCreated: mapRef.current has been set to Leaflet map instance ID: ${mapId}.`);
       }}
     >
       <TileLayer
@@ -125,7 +118,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id}
+          key={event.id} // Use event.id for marker key
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
