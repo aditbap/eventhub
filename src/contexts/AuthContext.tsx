@@ -31,7 +31,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  updateUserName: (newName: string) => Promise<{ success: boolean, error?: { message: string } }>;
+  updateUserName: (newName: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -86,19 +86,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!name || !email || !password) {
       return { success: false, error: { message: "Name, email, and password are required." } };
     }
-    setLoading(true);
+    // setLoading(true); // Already handled by form
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: name });
         
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        const userData = {
           uid: userCredential.user.uid,
           displayName: name,
           email: email,
           photoURL: userCredential.user.photoURL || null,
           createdAt: serverTimestamp(), 
-        });
+        };
+        await setDoc(doc(db, "users", userCredential.user.uid), userData);
+
         const loggedInUser = { 
           uid: userCredential.user.uid, 
           email: userCredential.user.email, 
@@ -106,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        // router.push('/explore'); // Moved to useEffect
+        // router.push('/explore'); // Handled by useEffect
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -115,12 +117,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn("AuthContext: Registration failed:", err.code, err.message); 
       return { success: false, error: { code: err.code, message: err.message } };
     } finally {
-      setLoading(false);
+      // setLoading(false); // Already handled by form
     }
-  }, [setUser]); 
+  }, [setUser, db]); 
 
   const loginWithGoogle = useCallback(async () => {
-    setLoading(true);
+    // setLoading(true); // Already handled by form
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
@@ -130,13 +132,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDoc = await getDoc(userDocRef);
 
         if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
+          const googleUserData = {
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName || null,
             email: firebaseUser.email || null,
             photoURL: firebaseUser.photoURL || null,
             createdAt: serverTimestamp(),
-          });
+          };
+          await setDoc(userDocRef, googleUserData);
         }
         setUser({
           uid: firebaseUser.uid,
@@ -144,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
-        // router.push('/explore'); // Moved to useEffect
+        // router.push('/explore'); // Handled by useEffect
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -171,9 +174,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       error.displayMessage = userMessage; 
       throw error;
     } finally {
-      setLoading(false);
+      // setLoading(false); // Already handled by form
     }
-  }, [setUser]); 
+  }, [setUser, db]); 
 
   const logout = useCallback(async () => {
     setLoading(true);
@@ -188,7 +191,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router, setUser]); 
 
-  const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean, error?: { message: string } }> => {
+  const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
     if (!auth.currentUser) {
       return { success: false, error: { message: "No user logged in." } };
     }
@@ -198,22 +201,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     console.time("updateUserNameFirebase");
+    const userToUpdate = auth.currentUser; // Capture current user early
+    
     try {
-      const userDocRef = doc(db, "users", auth.currentUser.uid);
-      await Promise.all([
-        updateProfile(auth.currentUser, { displayName: trimmedNewName }),
-        updateDoc(userDocRef, { displayName: trimmedNewName })
-      ]);
+      console.log(`Attempting to update Firebase Auth profile for UID: ${userToUpdate.uid} with name: "${trimmedNewName}"`);
+      await updateProfile(userToUpdate, { displayName: trimmedNewName });
+      console.log("Firebase Auth profile updated successfully.");
+
+      const userDocRef = doc(db, "users", userToUpdate.uid);
+      console.log(`Attempting to update Firestore document users/${userToUpdate.uid} with name: "${trimmedNewName}"`);
+      await updateDoc(userDocRef, { displayName: trimmedNewName });
+      console.log("Firestore document updated successfully.");
       
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
       console.timeEnd("updateUserNameFirebase");
       return { success: true };
+
     } catch (err: any) {
-      console.timeEnd("updateUserNameFirebase");
-      console.warn("AuthContext: Failed to update user name:", err);
-      return { success: false, error: { message: err.message || "Could not update name." } };
+      // Ensure console.timeEnd is called even on error for accurate measurement if one part succeeded
+      if (console.timeLog) { // console.timeLog might not exist in all environments, though timeEnd should
+         console.timeLog("updateUserNameFirebase", "Error occurred during updateUserNameFirebase");
+      } else {
+         console.timeEnd("updateUserNameFirebase");
+      }
+      console.warn(`AuthContext: Failed to update user name. Error Code: ${err.code}, Message: ${err.message}`, err);
+      return { success: false, error: { message: err.message || "Could not update name.", code: err.code } };
     }
-  }, [setUser]); 
+  }, [setUser, db]); // Added db to dependency array
   
   useEffect(() => {
     const allowedUnauthenticatedPaths = [
