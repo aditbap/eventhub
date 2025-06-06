@@ -1,6 +1,7 @@
 
 'use client';
 
+import React from 'react'; // Import React for React.memo
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -59,7 +60,8 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-export default function EventMap({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
+// Define the component logic
+function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   if (typeof window === 'undefined') {
     return null; 
   }
@@ -93,3 +95,8 @@ export default function EventMap({ events, initialPosition = [-6.2971, 106.7000]
     </MapContainer>
   );
 }
+
+// Wrap the component with React.memo for performance optimization and to prevent re-initialization issues.
+const EventMap = React.memo(EventMapComponent);
+
+export default EventMap;
