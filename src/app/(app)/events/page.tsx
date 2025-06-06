@@ -132,7 +132,7 @@ export default function AllEventsPage() {
               <Search className="h-6 w-6" />
             </Button>
           )}
-          <Button variant="ghost" size="icon" onClick={handleFilterIconClick} className="text-foreground hover:bg-muted/20 rounded-full">
+          <Button variant="ghost" size="icon" onClick={handleFilterIconClick} className="text-foreground hover:bg-muted/20 rounded-full" aria-label="Open event filters">
             <FilterIcon className="h-6 w-6" />
           </Button>
         </div>
