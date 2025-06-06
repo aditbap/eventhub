@@ -7,16 +7,22 @@ import type { Ticket } from '@/types';
 import { Button } from '@/components/ui/button';
 import { TicketCard } from '@/components/profile/TicketCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, SettingsIcon } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, deleteDoc, doc as firestoreDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { TicketDetailsDialog } from '@/components/profile/TicketDetailsDialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const router = useRouter();
+
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
@@ -65,6 +71,36 @@ export default function ProfilePage() {
     }
   }, [user]);
 
+  const handleOpenTicketDialog = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setIsTicketDialogOpen(true);
+  };
+
+  const handleCloseTicketDialog = () => {
+    setSelectedTicket(null);
+    setIsTicketDialogOpen(false);
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(firestoreDoc(db, 'userTickets', ticketId));
+      setTickets(prevTickets => prevTickets.filter(t => t.id !== ticketId));
+      toast({
+        title: "Ticket Deleted",
+        description: "Your ticket has been successfully removed.",
+      });
+      handleCloseTicketDialog();
+    } catch (error) {
+      console.error("Error deleting ticket:", error);
+      toast({
+        title: "Error",
+        description: "Could not delete your ticket. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (authLoading || !user) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -111,7 +147,11 @@ export default function ProfilePage() {
         ) : tickets.length > 0 ? (
           <div className="space-y-4">
             {tickets.map((ticket) => (
-              <TicketCard key={ticket.id} ticket={ticket} />
+              <TicketCard
+                key={ticket.id}
+                ticket={ticket}
+                onClick={() => handleOpenTicketDialog(ticket)}
+              />
             ))}
           </div>
         ) : (
@@ -122,6 +162,13 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+
+      <TicketDetailsDialog
+        isOpen={isTicketDialogOpen}
+        onClose={handleCloseTicketDialog}
+        ticket={selectedTicket}
+        onDeleteTicket={handleDeleteTicket}
+      />
     </div>
   );
 }

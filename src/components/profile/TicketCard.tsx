@@ -51,37 +51,43 @@ const formatEventDateTime = (dateStr: string, timeStr?: string): string => {
 };
 
 
-export function TicketCard({ ticket }: { ticket: Ticket }) {
+export function TicketCard({ ticket, onClick }: { ticket: Ticket; onClick: () => void }) {
   const formattedDateTime = formatEventDateTime(ticket.eventDate, ticket.eventTime);
   const imageUrl = ticket.eventImageUrl || `https://placehold.co/100x100.png?text=${ticket.eventName.charAt(0)}`;
   const imageHint = ticket.eventImageHint || "event";
 
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow rounded-xl bg-card">
-      <CardContent className="p-3 flex items-center space-x-3">
-        <div className="relative w-20 h-20 flex-shrink-0">
-          <Image 
-            src={imageUrl} 
-            alt={ticket.eventName} 
-            layout="fill" 
-            objectFit="cover" 
-            className="rounded-lg"
-            data-ai-hint={imageHint}
-          />
-        </div>
-        <div className="flex-grow min-w-0">
-          <p className="text-xs font-semibold text-primary mb-0.5 truncate">
-            {formattedDateTime}
-          </p>
-          <h3 className="text-base font-headline font-semibold text-foreground mb-1 line-clamp-2">
-            {ticket.eventName}
-          </h3>
-          <div className="flex items-center text-xs text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-            <span className="truncate">{ticket.eventLocation}</span>
+    <button
+      onClick={onClick}
+      className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+      aria-label={`View details for ticket ${ticket.eventName}`}
+    >
+      <Card className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow rounded-xl bg-card w-full">
+        <CardContent className="p-3 flex items-center space-x-3">
+          <div className="relative w-20 h-20 flex-shrink-0">
+            <Image 
+              src={imageUrl} 
+              alt={ticket.eventName} 
+              layout="fill" 
+              objectFit="cover" 
+              className="rounded-lg"
+              data-ai-hint={imageHint}
+            />
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="flex-grow min-w-0">
+            <p className="text-xs font-semibold text-primary mb-0.5 truncate">
+              {formattedDateTime}
+            </p>
+            <h3 className="text-base font-headline font-semibold text-foreground mb-1 line-clamp-2">
+              {ticket.eventName}
+            </h3>
+            <div className="flex items-center text-xs text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+              <span className="truncate">{ticket.eventLocation}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
   );
 }
