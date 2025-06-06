@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react'; // Added React for React.use
 import type { Event, Ticket } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { eventStore } from '@/lib/eventStore';
-import { useRouter } from 'next/navigation'; // For back button
+import { useRouter } from 'next/navigation';
 
 // Category colors matching Explore page and globals.css
 const categoryColors: { [key in Event['category']]: string } = {
@@ -24,7 +24,11 @@ const categoryColors: { [key in Event['category']]: string } = {
   Other: 'bg-gray-500 text-white',
 };
 
-export default function EventDetailsPage({ params }: { params: { eventId: string } }) {
+// Updated props to expect params as a Promise
+export default function EventDetailsPage({ params: paramsPromise }: { params: Promise<{ eventId: string }> }) {
+  const params = React.use(paramsPromise); // Unwrap the promise
+  const { eventId } = params; // Destructure eventId from the resolved params
+
   const [event, setEvent] = useState<Event | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [isGettingTicket, setIsGettingTicket] = useState(false);
@@ -35,10 +39,11 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
   useEffect(() => {
     setLoadingEvent(true);
     const allEvents = eventStore.getEvents();
-    const foundEvent = allEvents.find(e => e.id === params.eventId);
+    // Use the resolved eventId from React.use(paramsPromise)
+    const foundEvent = allEvents.find(e => e.id === eventId);
     setEvent(foundEvent || null);
     setLoadingEvent(false);
-  }, [params.eventId]);
+  }, [eventId]); // Use resolved eventId in dependency array
 
   const handleGetTicket = async () => {
     if (!user || !event) return;
@@ -46,7 +51,7 @@ export default function EventDetailsPage({ params }: { params: { eventId: string
     try {
       const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = { 
         userId: user.uid,
-        eventId: event.id,
+        eventId: event.id, // event.id comes from the fetched event state
         eventName: event.title,
         eventDate: event.date,
         eventTime: event.time || undefined,
