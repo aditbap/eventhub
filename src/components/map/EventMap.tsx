@@ -56,38 +56,53 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-let mapIdCounter = 0; 
+let eventMapComponentInstanceCounter = 0; // For debugging component instances
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
-  const mapInstanceRef = useRef<LeafletMap | null>(null);
-  const [mapContainerKey, setMapContainerKey] = useState(() => `leaflet-map-key-${mapIdCounter++}`);
+  const instanceId = useRef(eventMapComponentInstanceCounter++).current; // Stable ID for this instance
+  const mapRef = useRef<LeafletMap | null>(null);
+  
+  // Key for MapContainer. This will be new if EventMapComponent is remounted (e.g. by StrictMode).
+  const [mapContainerKey] = useState(() => `map-container-key-${instanceId}-${Date.now()}`);
 
   useEffect(() => {
-    const currentMapInstance = mapInstanceRef.current;
-    console.log(`EventMapComponent Effect setup. Key: ${mapContainerKey}. Current map instance: ${currentMapInstance ? 'exists' : 'null'}`);
+    console.log(`[EMC #${instanceId} key:${mapContainerKey}] Effect setup. mapRef current: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+    
+    // Capture the map instance that this effect is responsible for cleaning up.
+    // This is important because mapRef.current might be updated by a new render's whenCreated
+    // (due to StrictMode remount) before this old effect's cleanup function runs.
+    const mapInstanceForThisEffectRun = mapRef.current;
 
     return () => {
-      console.log(`EventMapComponent Cleanup for key: ${mapContainerKey}. Map instance to remove: ${currentMapInstance ? (currentMapInstance as any)._leaflet_id : 'null'}`);
-      if (currentMapInstance) {
-        currentMapInstance.remove();
+      console.log(`[EMC #${instanceId} key:${mapContainerKey}] Effect CLEANUP. Trying to remove map: ${mapInstanceForThisEffectRun ? (mapInstanceForThisEffectRun as any)._leaflet_id : 'null'}. Current mapRef: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
+      if (mapInstanceForThisEffectRun) {
+        mapInstanceForThisEffectRun.remove();
+      }
+      // If the map being cleaned up is the one currently in the ref for *this instance*, nullify it.
+      // This check is to be absolutely sure we're not nullifying a ref that might have been
+      // repopulated by a new map instance if cleanup timing is tricky with StrictMode.
+      if (mapRef.current === mapInstanceForThisEffectRun) {
+        mapRef.current = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  // The dependencies ensure this effect and its cleanup are correctly scoped to this component instance and its MapContainer key.
+  // It runs once when the component instance (defined by instanceId and its mapContainerKey) mounts.
+  }, [mapContainerKey, instanceId]); 
 
-  console.log(`EventMapComponent Render. MapContainer key: ${mapContainerKey}. Current mapInstanceRef: ${mapInstanceRef.current ? (mapInstanceRef.current as any)._leaflet_id : 'null'}`);
+  console.log(`[EMC #${instanceId} key:${mapContainerKey}] RENDERING. mapRef current: ${mapRef.current ? (mapRef.current as any)._leaflet_id : 'null'}`);
   
   return (
     <MapContainer
-      key={mapContainerKey} 
+      key={mapContainerKey} // Crucial: forces React to create a new DOM element & component instance if key changes
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(map) => {
-        console.log(`MapContainer whenCreated for key ${mapContainerKey}: New map instance (Leaflet ID: ${(map as any)._leaflet_id}). Setting mapInstanceRef.`);
-        mapInstanceRef.current = map;
+        // This is called when Leaflet initializes the map for the MapContainer with `mapContainerKey`
+        console.log(`[EMC #${instanceId} key:${mapContainerKey}] MapContainer WHENCREATED. New map ID: ${(map as any)._leaflet_id}. Setting mapRef.current.`);
+        mapRef.current = map;
       }}
     >
       <TileLayer
@@ -122,5 +137,3 @@ const EventMap = memo(EventMapComponent);
 EventMap.displayName = 'EventMap';
 
 export default EventMap;
-
-    
