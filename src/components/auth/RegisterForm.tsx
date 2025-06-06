@@ -71,12 +71,12 @@ export function RegisterForm() {
       const err = result.error;
       if (err.code === 'auth/email-already-in-use') {
         setError("Email already in use.");
-      } else if (err.code === 'auth/invalid-email') { // Firebase's definition of invalid-email
+      } else if (err.code === 'auth/invalid-email') { 
         setError("Invalid email address format.");
       } else {
         setError(err.message || 'Failed to register. Please try again.');
       }
-      console.error("Registration attempt failed (handled in form): Code:", err.code, "Message:", err.message);
+      console.warn("Registration attempt failed (handled in form): Code:", err.code, "Message:", err.message);
     }
     // If successful, AuthContext handles navigation.
   }
@@ -142,7 +142,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="Full name" {...field} className="pl-10 h-12" />
+                    <Input placeholder="Full name" {...field} className="pl-10" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -157,7 +157,7 @@ export function RegisterForm() {
                 <FormControl>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input placeholder="abc@email.com" {...field} className="pl-10 h-12" />
+                    <Input placeholder="abc@email.com" {...field} className="pl-10" />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -176,7 +176,7 @@ export function RegisterForm() {
                       type={showPassword ? 'text' : 'password'} 
                       placeholder="Your password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12"
+                      className="pl-10 pr-10"
                     />
                     <Button 
                       type="button" 
@@ -206,7 +206,7 @@ export function RegisterForm() {
                       type={showConfirmPassword ? 'text' : 'password'} 
                       placeholder="Confirm password" 
                       {...field} 
-                      className="pl-10 pr-10 h-12"
+                      className="pl-10 pr-10"
                     />
                     <Button 
                       type="button" 
@@ -261,3 +261,5 @@ export function RegisterForm() {
     </div>
   );
 }
+
+    
