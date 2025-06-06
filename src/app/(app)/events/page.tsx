@@ -8,11 +8,30 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Search, Filter as FilterIcon, Gift, Ticket, X as XIcon } from 'lucide-react'; // Changed MoreVertical to FilterIcon
+import { ArrowLeft, Search, Filter as FilterIcon, Gift, Ticket, X as XIcon } from 'lucide-react';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-// Removed DropdownMenu imports as they are no longer used with a simple Filter icon.
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
+const filterCategories: Array<{ value: Event['category'] | 'All', label: string }> = [
+  { value: 'All', label: 'All Categories' },
+  { value: 'Music', label: 'Music' },
+  { value: 'Food', label: 'Food' },
+  { value: 'Sports', label: 'Sports' },
+  { value: 'Tech', label: 'Tech' },
+  { value: 'Other', label: 'Other' },
+];
 
 export default function AllEventsPage() {
   const router = useRouter();
@@ -21,22 +40,35 @@ export default function AllEventsPage() {
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
+  const [tempFilters, setTempFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
+
   useEffect(() => {
-    const eventsFromStore = eventStore.getEvents();
+    const eventsFromStore = eventStore.getEvents(); // Already sorted by date desc
     setAllEvents(eventsFromStore);
   }, []);
 
   useEffect(() => {
     let currentEvents = [...allEvents];
+
+    // Filter by search query
     if (searchQuery.trim() !== '') {
-      currentEvents = allEvents.filter(event =>
+      currentEvents = currentEvents.filter(event =>
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.description.toLowerCase().includes(searchQuery.toLowerCase())
+        event.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        event.location.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    currentEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Filter by category
+    if (activeFilters.category !== 'All') {
+      currentEvents = currentEvents.filter(event => event.category === activeFilters.category);
+    }
+
+    // Events are already sorted by date descending from eventStore, so no need to re-sort unless criteria change
     setFilteredEvents(currentEvents);
-  }, [searchQuery, allEvents]);
+  }, [searchQuery, allEvents, activeFilters]);
 
   const handleSearchIconClick = () => {
     setSearchActive(true);
@@ -47,10 +79,28 @@ export default function AllEventsPage() {
     setSearchQuery('');
   };
 
-  const handleFilterClick = () => {
-    // Placeholder for filter functionality
-    alert('Filter functionality will be implemented here!');
+  const handleFilterIconClick = () => {
+    setTempFilters(activeFilters); // Initialize sheet with current active filters
+    setIsFilterSheetOpen(true);
   };
+
+  const handleApplyFilters = () => {
+    setActiveFilters(tempFilters);
+    setIsFilterSheetOpen(false);
+  };
+
+  const handleClearFiltersInSheet = () => {
+    setTempFilters({ category: 'All' });
+    // Optionally, if you want clear to also apply immediately:
+    // setActiveFilters({ category: 'All' });
+    // setIsFilterSheetOpen(false);
+  };
+
+  const handleCategoryChangeInSheet = (category: string) => {
+    setTempFilters(prev => ({ ...prev, category: category as Event['category'] | 'All' }));
+  };
+  
+  const currentEventsToDisplay = filteredEvents;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -82,15 +132,13 @@ export default function AllEventsPage() {
               <Search className="h-6 w-6" />
             </Button>
           )}
-          {/* Changed MoreVertical to FilterIcon and added onClick handler */}
-          <Button variant="ghost" size="icon" onClick={handleFilterClick} className="text-foreground hover:bg-muted/20 rounded-full">
+          <Button variant="ghost" size="icon" onClick={handleFilterIconClick} className="text-foreground hover:bg-muted/20 rounded-full">
             <FilterIcon className="h-6 w-6" />
           </Button>
         </div>
       </header>
 
       <main className="flex-grow p-4 space-y-6 pb-20">
-        {/* Invite Banner Section */}
         <div className="relative rounded-xl overflow-hidden shadow-lg bg-gradient-to-r from-green-400 to-emerald-500 p-6 text-white">
           <div className="relative z-10">
             <h2 className="text-2xl font-bold font-headline mb-1">Invite your friends</h2>
@@ -115,24 +163,78 @@ export default function AllEventsPage() {
           />
         </div>
 
-        {/* Events List Section */}
         <div className="space-y-4">
-          {(searchQuery.trim() !== '' ? filteredEvents : allEvents).length > 0 ? (
-            (searchQuery.trim() !== '' ? filteredEvents : allEvents).map(event => (
+          {currentEventsToDisplay.length > 0 ? (
+            currentEventsToDisplay.map(event => (
               <Link key={event.id} href={`/events/${event.id}`} passHref>
                 <AllEventsEventItem event={event} />
               </Link>
             ))
           ) : (
             <div className="text-center py-10">
-              <p className="text-muted-foreground">{searchQuery.trim() !== '' ? 'No events match your search.' : 'No events found.'}</p>
+              <p className="text-muted-foreground">
+                {searchQuery.trim() !== '' || activeFilters.category !== 'All'
+                  ? 'No events match your search or filter criteria.'
+                  : 'No events found.'}
+              </p>
               <p className="text-sm text-muted-foreground">
-                {searchQuery.trim() !== '' ? 'Try a different search term.' : 'Check back later or create a new event!'}
+                {searchQuery.trim() !== '' || activeFilters.category !== 'All'
+                  ? 'Try different keywords or adjust your filters.'
+                  : 'Check back later or create a new event!'}
               </p>
             </div>
           )}
         </div>
       </main>
+
+      <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+        <SheetContent className="w-[320px] sm:w-[400px] flex flex-col">
+          <SheetHeader className="mb-2">
+            <SheetTitle>Filter Events</SheetTitle>
+            <SheetDescription>
+              Select criteria to refine your event list.
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-grow overflow-y-auto py-4 space-y-6">
+            <div>
+              <Label className="text-base font-semibold mb-3 block">Category</Label>
+              <RadioGroup
+                value={tempFilters.category}
+                onValueChange={handleCategoryChangeInSheet}
+                className="space-y-2"
+              >
+                {filterCategories.map((category) => (
+                  <div key={category.value} className="flex items-center space-x-2">
+                    <RadioGroupItem value={category.value} id={`filter-category-${category.value}`} />
+                    <Label htmlFor={`filter-category-${category.value}`} className="font-normal">{category.label}</Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+            {/* Placeholder for more filters like date range or price */}
+            {/* 
+            <div className="border-t pt-4">
+              <Label className="text-base font-semibold mb-3 block">Date Range</Label>
+              <p className="text-sm text-muted-foreground">Date picker coming soon...</p>
+            </div>
+            */}
+          </div>
+
+          <SheetFooter className="mt-auto pt-4 border-t">
+            <Button variant="outline" onClick={handleClearFiltersInSheet} className="w-full sm:w-auto">
+              Clear Filters
+            </Button>
+            <Button onClick={handleApplyFilters} className="w-full sm:w-auto">
+              Apply Filters
+            </Button>
+          </SheetFooter>
+          <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+            <XIcon className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </SheetClose>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
