@@ -106,14 +106,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        router.push('/explore'); // Navigation as a side effect
+        router.push('/explore'); 
         return { success: true, user: loggedInUser };
       } else {
-        // This case should ideally not be reached if createUserWithEmailAndPassword resolves.
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
       }
     } catch (err: any) {
-      console.warn("Registration failed in AuthContext:", err); // Changed from console.error
+      console.warn("Registration failed in AuthContext:", err.code, err.message); 
       return { success: false, error: { code: err.code, message: err.message } };
     } finally {
       setLoading(false);
@@ -149,9 +148,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
-      console.warn("Google login failed. Raw error object:", error); // Changed from console.error
+      console.warn("Google login failed. Raw error object:", error); 
       if (error.code) {
-        console.warn("Error code:", error.code); // Changed from console.error
+        console.warn("Error code:", error.code); 
         switch (error.code) {
           case 'auth/popup-closed-by-user':
             userMessage = 'Google Sign-In was cancelled. Please try again.';
@@ -167,9 +166,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             break;
         }
       } else {
-         console.warn("Google login failed (no code):", error.message, error); // Changed from console.error
+         console.warn("Google login failed (no code):", error.message, error); 
       }
-      // Re-throw the error for the calling component to handle and display userMessage
       error.displayMessage = userMessage; 
       throw error;
     } finally {
@@ -190,6 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [router]);
   
+  // Effect to redirect to /login if unauthenticated on a protected page
   useEffect(() => {
     const allowedUnauthenticatedPaths = [
       '/login',
@@ -206,6 +205,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       pathname !== '/' 
     ) {
       router.push('/login');
+    }
+  }, [user, loading, pathname, router]);
+
+  // NEW Effect: Redirect to /explore if authenticated and on an auth page
+  useEffect(() => {
+    const authPages = ['/login', '/register', '/reset-password', '/new-password'];
+    if (!loading && user && authPages.includes(pathname)) {
+      router.replace('/explore'); // Use replace to prevent back navigation to auth page
     }
   }, [user, loading, pathname, router]);
 
