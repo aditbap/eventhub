@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []); // router is not needed as dependency due to how it's obtained from next/navigation
 
   const register = useCallback(async (name: string, email: string, password: string): Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }> => {
     if (!name || !email || !password) {
@@ -110,15 +110,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Navigation handled by useEffect
         return { success: true, user: loggedInUser };
       } else {
+        // This case should ideally not be reached if createUserWithEmailAndPassword succeeds
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
       }
     } catch (err: any) {
-      console.warn("Registration failed in AuthContext:", err.code, err.message); 
+      console.warn("AuthContext: Registration failed:", err.code, err.message); 
       return { success: false, error: { code: err.code, message: err.message } };
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [setUser]); // Added setUser to dependency array for explicitness
 
   const loginWithGoogle = useCallback(async () => {
     setLoading(true);
@@ -174,20 +175,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [setUser]); // Added setUser
 
   const logout = useCallback(async () => {
     setLoading(true);
     try {
       await signOut(auth);
       setUser(null);
-      router.push('/login'); // Explicit navigation on logout
+      router.push('/login'); 
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, setUser]); // Added router and setUser
 
   const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean, error?: { message: string } }> => {
     if (!auth.currentUser) {
@@ -198,27 +199,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name cannot be empty." } };
     }
 
-    // Do NOT set global loading for this specific operation
-    // setLoading(true); 
     try {
-      // Update Firebase Auth profile
       await updateProfile(auth.currentUser, { displayName: trimmedNewName });
-
-      // Update Firestore user document
       const userDocRef = doc(db, "users", auth.currentUser.uid);
       await updateDoc(userDocRef, { displayName: trimmedNewName });
-
-      // Update local user state
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
-      
       return { success: true };
     } catch (err: any) {
-      console.error("Failed to update user name:", err);
+      console.warn("AuthContext: Failed to update user name:", err); // Changed to console.warn
       return { success: false, error: { message: err.message || "Could not update name." } };
-    } finally {
-      // setLoading(false); // Ensure global loading is not set here either
     }
-  }, []); // Dependencies: auth (stable), db (stable), setUser (stable from useState)
+  }, [setUser]); // Added setUser
   
   // Effect to redirect to /login if unauthenticated on a protected page
   useEffect(() => {
@@ -232,9 +223,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (
       !loading &&
       !user &&
-      !pathname.startsWith('/_next/') && // Ignore Next.js internal paths
+      !pathname.startsWith('/_next/') && 
       !allowedUnauthenticatedPaths.some(p => pathname === p || pathname.startsWith(p + '/')) &&
-      pathname !== '/' // Allow access to the root splash page
+      pathname !== '/' 
     ) {
       router.replace('/login');
     }
