@@ -42,9 +42,9 @@ export default function ProfilePage() {
               eventId: data.eventId,
               eventName: data.eventName,
               eventDate: data.eventDate,
-              eventTime: data.eventTime,
+              eventTime: data.eventTime, // Added eventTime
               eventLocation: data.eventLocation,
-              eventImageUrl: data.eventImageUrl,
+              eventImageUrl: data.eventImageUrl, // Added eventImageUrl
               eventImageHint: data.eventImageHint,
               qrCodeUrl: data.qrCodeUrl, 
               purchaseDate: purchaseDateStr,
@@ -96,7 +96,7 @@ export default function ProfilePage() {
         <Button 
           variant="default" 
           className="rounded-full bg-green-100 hover:bg-green-200 text-green-700 px-6 py-2 text-sm font-medium shadow-sm"
-          onClick={() => { /* Navigate to settings page or open settings modal */ console.log("Settings clicked"); logout(); /* temp logout */}}
+          onClick={() => router.push('/settings')}
         >
           Settings
         </Button>
@@ -129,3 +129,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
