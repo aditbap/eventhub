@@ -1,10 +1,10 @@
 
 'use client';
 
-import React from 'react'; // Import React for React.memo
+import React, { useEffect, useRef } from 'react'; // Import React, useEffect, useRef
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import L, { type Map as LeafletMap } from 'leaflet'; // Import L and LeafletMap type
 import type { Icon as LeafletIconType } from 'leaflet';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -34,8 +34,6 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
   });
 };
 
-// It's good practice to ensure default Leaflet icons are set up if not using custom for all
-// This helps if any marker somehow doesn't get a custom icon.
 // Using unpkg CDN for default icon images to avoid asset path issues with Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -62,12 +60,33 @@ interface EventMapProps {
 
 // Define the component logic
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
+  const mapRef = useRef<LeafletMap | null>(null); // Ref to store the map instance
+
+  useEffect(() => {
+    // Cleanup function: will be called when the component unmounts
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove(); // Explicitly remove the map instance
+        mapRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array means this effect runs once on mount and cleanup on unmount
+
   if (typeof window === 'undefined') {
-    return null; 
+    return null;
   }
 
   return (
-    <MapContainer center={initialPosition} zoom={initialZoom} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }} className="rounded-lg shadow-md z-0">
+    <MapContainer
+      center={initialPosition}
+      zoom={initialZoom}
+      scrollWheelZoom={true}
+      style={{ height: '100%', width: '100%' }}
+      className="rounded-lg shadow-md z-0"
+      whenCreated={(mapInstance) => {
+        mapRef.current = mapInstance;
+      }}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
