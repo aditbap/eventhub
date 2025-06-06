@@ -24,7 +24,8 @@ import { format } from 'date-fns';
 import { CalendarIcon, DollarSign, ImageUp, Loader2, PlusSquare, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
-import type { Event } from '@/types'; // Assuming your Event type is defined
+import type { Event } from '@/types';
+import { eventStore } from '@/lib/eventStore';
 
 const eventCategories: Event['category'][] = ['Music', 'Food', 'Sports', 'Tech', 'Other'];
 
@@ -41,7 +42,6 @@ const createEventFormSchema = z.object({
   category: z.enum(eventCategories, { required_error: 'Category is required.' }),
   price: z.coerce.number().min(0, { message: 'Price cannot be negative.' }).optional().default(0),
   imageUrl: z.any()
-    // .refine((file) => !!file, "Event image is required.") // Optional for now
     .refine((file) => !file || file.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
     .refine((file) => !file || ACCEPTED_IMAGE_TYPES.includes(file.type), ".jpg, .jpeg, .png and .webp files are accepted.")
     .optional(),
@@ -71,14 +71,29 @@ export default function CreateEventPage() {
 
   async function onSubmit(data: CreateEventFormValues) {
     setIsLoading(true);
-    console.log('Form submitted:', data);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const newEventData: Event = {
+      id: Date.now().toString(), // Simple unique ID for mock
+      title: data.title,
+      description: data.description,
+      date: format(data.date, "yyyy-MM-dd"), // Format date as string
+      time: data.time,
+      location: data.location,
+      venue: data.venue || undefined, // Ensure venue is string or undefined
+      category: data.category,
+      imageUrl: imagePreview || 'https://placehold.co/300x200.png', // Use preview or placeholder
+      imageHint: data.category.toLowerCase() + ' event', // Simple hint based on category
+      price: data.price,
+      attendanceCount: 0, // Default for new event
+      attendees: [],      // Default for new event
+      isBookmarked: false,// Default for new event
+    };
+
+    eventStore.addEvent(newEventData);
 
     toast({
       title: '🎉 Event Created!',
-      description: `${data.title} has been successfully scheduled.`,
+      description: `${data.title} has been successfully scheduled. Check the Explore page!`,
       action: <Sparkles className="h-5 w-5 text-green-500" />,
     });
     form.reset();
@@ -89,7 +104,7 @@ export default function CreateEventPage() {
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      form.setValue('imageUrl', file); // Set file object for validation
+      form.setValue('imageUrl', file); 
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -282,21 +297,21 @@ export default function CreateEventPage() {
           <FormField
             control={form.control}
             name="imageUrl"
-            render={({ field: { onChange, value, ...restField } }) => (
+            render={({ field: { onChange, value, ...restField } }) => ( // Note: value is the File object here
               <FormItem>
                 <FormLabel>Event Image</FormLabel>
                 <FormControl>
                   <Input 
                     type="file" 
                     accept="image/png, image/jpeg, image/webp" 
-                    onChange={handleImageChange}
+                    onChange={handleImageChange} // This sets imagePreview (data URI) and form's imageUrl (File)
                     className="block w-full text-sm text-slate-500
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-full file:border-0
                       file:text-sm file:font-semibold
                       file:bg-primary/10 file:text-primary
                       hover:file:bg-primary/20"
-                    {...restField}
+                    {...restField} // Use restField for other input props from react-hook-form
                   />
                 </FormControl>
                 {imagePreview && (
@@ -325,5 +340,3 @@ export default function CreateEventPage() {
     </div>
   );
 }
-
-    
