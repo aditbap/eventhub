@@ -175,4 +175,3 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
     </Link>
   );
 }
-
