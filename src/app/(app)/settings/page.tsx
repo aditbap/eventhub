@@ -1,15 +1,16 @@
-
 'use client';
 
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Plus, Loader2, LogOut, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Plus, Loader2, LogOut, ShieldAlert, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
+import { ChangeNameDialog } from '@/components/settings/ChangeNameDialog';
+import { useToast } from "@/hooks/use-toast";
 
 interface SettingsItemProps {
   icon: React.ElementType;
@@ -46,9 +47,11 @@ const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, la
 
 
 export default function SettingsPage() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, updateUserName } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isChangeNameDialogOpen, setIsChangeNameDialogOpen] = useState(false);
 
   if (loading) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -59,7 +62,12 @@ export default function SettingsPage() {
   }
 
   const accountItems: SettingsItemProps[] = [
-    { icon: UserIcon, label: 'Full name', value: user.displayName || 'N/A', href: '#' }, 
+    { 
+      icon: UserIcon, 
+      label: 'Full name', 
+      value: user.displayName || 'N/A', 
+      onClick: () => setIsChangeNameDialogOpen(true)
+    }, 
     { icon: Mail, label: 'Email', value: user.email || 'N/A' }, 
     { icon: Lock, label: 'Change Password', value: '••••••••••••', href: '/new-password' }, 
     { icon: Phone, label: 'Day of birth', value: '02/02/2005', href: '#' }, 
@@ -68,12 +76,23 @@ export default function SettingsPage() {
 
   const handleDeleteAccountConfirm = () => {
     console.log('Account deletion confirmed by user. Implement actual deletion logic here.');
-    // Example: Call a function from useAuth like `await deleteAccount();`
-    // This function would handle Firebase re-authentication and user deletion.
-    // After successful deletion, navigate the user (e.g., to login page).
     setIsDeleteDialogOpen(false);
-    // For now, just log out as a placeholder
     logout(); 
+  };
+
+  const handleSaveName = async (newName: string) => {
+    const result = await updateUserName(newName);
+    if (result.success) {
+      toast({
+        title: "Name Updated",
+        description: "Your display name has been successfully updated.",
+        action: <CheckCircle className="h-5 w-5 text-green-500" />,
+      });
+      // Dialog will close itself on successful onSave()
+    } else {
+      // Let the dialog handle displaying its internal error by throwing it
+      throw new Error(result.error?.message || "Failed to update name. Please try again.");
+    }
   };
 
   return (
@@ -107,6 +126,7 @@ export default function SettingsPage() {
                 label={item.label}
                 value={item.value}
                 href={item.href}
+                onClick={item.onClick}
               />
               {index < accountItems.length - 1 && <hr className="border-border ml-4" />}
             </React.Fragment>
@@ -151,6 +171,13 @@ export default function SettingsPage() {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteAccountConfirm}
+      />
+
+      <ChangeNameDialog
+        isOpen={isChangeNameDialogOpen}
+        onClose={() => setIsChangeNameDialogOpen(false)}
+        currentName={user.displayName || ''}
+        onSave={handleSaveName}
       />
     </div>
   );

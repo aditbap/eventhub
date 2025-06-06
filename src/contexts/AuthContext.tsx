@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ReactNode } from 'react';
@@ -14,7 +13,7 @@ import {
   signInWithPopup,
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore'; // Added updateDoc
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface User {
@@ -31,6 +30,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<{ success: true; user: User } | { success: false; error: { code?: string; message: string } }>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  updateUserName: (newName: string) => Promise<{ success: boolean, error?: { message: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: userCredential.user.photoURL
         };
         setUser(loggedInUser);
-        router.push('/explore'); 
+        // router.push('/explore'); // Redirection handled by useEffect
         return { success: true, user: loggedInUser };
       } else {
         return { success: false, error: { message: "User creation failed unexpectedly after Firebase call." } };
@@ -144,7 +144,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           displayName: firebaseUser.displayName,
           photoURL: firebaseUser.photoURL,
         });
-        router.push('/explore');
+        // router.push('/explore'); // Redirection handled by useEffect
       }
     } catch (error: any) {
       let userMessage = 'Failed to login with Google. Please try again.';
@@ -187,6 +187,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     }
   }, [router]);
+
+  const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean, error?: { message: string } }> => {
+    if (!auth.currentUser) {
+      return { success: false, error: { message: "No user logged in." } };
+    }
+    const trimmedNewName = newName.trim();
+    if (!trimmedNewName) {
+      return { success: false, error: { message: "Name cannot be empty." } };
+    }
+
+    setLoading(true);
+    try {
+      // Update Firebase Auth profile
+      await updateProfile(auth.currentUser, { displayName: trimmedNewName });
+
+      // Update Firestore user document
+      const userDocRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(userDocRef, { displayName: trimmedNewName });
+
+      // Update local user state
+      setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
+      
+      setLoading(false);
+      return { success: true };
+    } catch (err: any) {
+      console.error("Failed to update user name:", err);
+      setLoading(false);
+      return { success: false, error: { message: err.message || "Could not update name." } };
+    }
+  }, []);
   
   // Effect to redirect to /login if unauthenticated on a protected page
   useEffect(() => {
@@ -218,7 +248,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName }}>
       {children}
     </AuthContext.Provider>
   );
