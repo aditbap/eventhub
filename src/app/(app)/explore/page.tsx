@@ -20,6 +20,7 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label'; // For future filter controls
+import { useRouter } from 'next/navigation'; // Added for navigation
 
 // Mock data for events - extended with attendees
 const MOCK_EVENTS: Event[] = [
@@ -198,6 +199,7 @@ export default function ExplorePage() {
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const router = useRouter(); // Initialize router
 
   useEffect(() => {
     setLoadingLocation(true);
@@ -265,7 +267,13 @@ export default function ExplorePage() {
               </div>
             )}
           </div>
-          <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-white/20 relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-primary-foreground hover:bg-white/20 relative"
+            onClick={() => router.push('/notifications')} // Navigate to notifications
+            aria-label="Notifications"
+          >
             <Bell className="h-6 w-6" />
             <span className="absolute top-2 right-2 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-primary" />
           </Button>
