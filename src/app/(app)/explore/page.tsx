@@ -21,30 +21,26 @@ import {
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
-import { eventStore } from '@/lib/eventStore'; // Import the event store
-
-// MOCK_EVENTS constant is now removed from here and lives in eventStore.ts
+import { eventStore } from '@/lib/eventStore';
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All');
-  const [location, setLocation] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<string | null>(null); // Renamed for clarity
   const [loadingLocation, setLoadingLocation] = useState(true);
-  
+
   const [allEvents, setAllEvents] = useState<Event[]>(() => eventStore.getEvents());
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const router = useRouter();
 
-  // Effect to subscribe to eventStore updates
   useEffect(() => {
     const handleStoreUpdate = () => {
       setAllEvents(eventStore.getEvents());
     };
     const unsubscribe = eventStore.subscribe(handleStoreUpdate);
-    // Initial fetch in case store was updated before subscription (though unlikely for this setup)
-    handleStoreUpdate(); 
-    return () => unsubscribe(); // Cleanup subscription on component unmount
+    handleStoreUpdate();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -53,25 +49,25 @@ export default function ExplorePage() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           () => {
-            setLocation('Bintaro'); 
+            setUserLocation('Bintaro'); // Hardcoded for now, replace with actual location data if available
             setLoadingLocation(false);
           },
           () => {
-            setLocation('Bintaro'); 
+            setUserLocation('Bintaro'); // Fallback
             setLoadingLocation(false);
           },
           { timeout: 3000 }
         );
       } else {
-        setLocation('Bintaro'); 
+        setUserLocation('Bintaro'); // Fallback
         setLoadingLocation(false);
       }
     }, 500);
   }, []);
 
   useEffect(() => {
-    let eventsToFilter = [...allEvents]; // Use the state variable that's updated by the store
-    
+    let eventsToFilter = [...allEvents];
+
     if (currentCategory !== 'All') {
       eventsToFilter = eventsToFilter.filter(event => event.category === currentCategory);
     }
@@ -82,18 +78,22 @@ export default function ExplorePage() {
         event.description.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-     // Sort events by date (ascending for chronological order of upcoming events)
     eventsToFilter.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     setFilteredEvents(eventsToFilter);
-  }, [allEvents, searchQuery, currentCategory]); // Depend on allEvents from the store
+  }, [allEvents, searchQuery, currentCategory]);
 
   const upcomingEvents = filteredEvents
     .filter(e => new Date(e.date) >= new Date() && e.attendees && e.attendees.length > 0)
-    .slice(0, 5); 
+    .slice(0, 5);
 
   const nearYouEvents = filteredEvents
-    .filter(e => new Date(e.date) >= new Date() && (!e.attendees || e.attendees.length === 0))
-    .slice(0, 5); 
+    .filter(e => {
+      const isUpcoming = new Date(e.date) >= new Date();
+      const hasFewOrNoAttendees = !e.attendees || e.attendees.length === 0;
+      const isLocationMatch = userLocation && e.location && e.location.toLowerCase().includes(userLocation.toLowerCase());
+      return isUpcoming && isLocationMatch && hasFewOrNoAttendees; // Prioritize location match for new/less crowded events
+    })
+    .slice(0, 5);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -109,13 +109,13 @@ export default function ExplorePage() {
             ) : (
               <div className="flex items-center font-semibold">
                 <LocationIcon className="h-4 w-4 mr-1" />
-                {location || 'Bintaro'} <ChevronDown className="h-4 w-4 ml-1" />
+                {userLocation || 'Bintaro'} <ChevronDown className="h-4 w-4 ml-1" />
               </div>
             )}
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="text-primary-foreground hover:bg-white/20 relative"
             onClick={() => router.push('/notifications')}
             aria-label="Notifications"
@@ -134,8 +134,8 @@ export default function ExplorePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               className="text-primary p-2.5 rounded-md hover:bg-primary/10 h-9 w-9"
               onClick={() => setIsFilterSheetOpen(true)}
               aria-label="Open filters"
@@ -146,22 +146,22 @@ export default function ExplorePage() {
         </div>
       </header>
 
-      <main className="flex-grow pt-16 pb-20"> 
-        <div className="container mx-auto px-4"> 
+      <main className="flex-grow pt-16 pb-20">
+        <div className="container mx-auto px-4">
           <CategoryFilter currentCategory={currentCategory} onSelectCategory={(cat) => setCurrentCategory(cat)} />
-          
-          <section className="mb-8"> 
-            <div className="flex justify-between items-center mb-4"> 
+
+          <section className="mb-8">
+            <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-headline font-semibold">Upcoming Events</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />
               </Link>
             </div>
             {upcomingEvents.length > 0 ? (
-              <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1"> 
+              <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1">
                 <div className="flex space-x-4 pb-4">
                   {upcomingEvents.map((event) => (
-                    <div key={event.id} className="w-[280px] h-full flex-shrink-0"> 
+                    <div key={event.id} className="w-[280px] h-full flex-shrink-0">
                         <EventCard event={event} variant="upcoming" />
                     </div>
                   ))}
@@ -174,7 +174,7 @@ export default function ExplorePage() {
           </section>
 
           <section>
-            <div className="flex justify-between items-center mb-4"> 
+            <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-headline font-semibold">Near You</h2>
               <Link href="/events" className="text-sm text-primary font-medium flex items-center">
                 See All <ChevronRight className="h-4 w-4 ml-0.5" />

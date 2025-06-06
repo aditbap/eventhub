@@ -38,11 +38,6 @@ const createEventFormSchema = z.object({
 
 type CreateEventFormValues = z.infer<typeof createEventFormSchema>;
 
-const MOCK_ATTENDEES: Attendee[] = [
-    { id: 'att1', name: 'User A', avatarUrl: 'https://placehold.co/32x32.png?text=A' },
-    { id: 'att2', name: 'User B', avatarUrl: 'https://placehold.co/32x32.png?text=B' },
-];
-
 export default function CreateEventPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -73,7 +68,7 @@ export default function CreateEventPage() {
       reader.onloadend = () => {
         const result = reader.result as string;
         setImagePreview(result);
-        setValue('imageUrl', result); 
+        setValue('imageUrl', result);
       };
       reader.readAsDataURL(file);
     } else {
@@ -96,8 +91,8 @@ export default function CreateEventPage() {
       price: data.price ?? 0,
       imageUrl: data.imageUrl,
       imageHint: data.imageHint,
-      attendees: MOCK_ATTENDEES,
-      attendanceCount: MOCK_ATTENDEES.length,
+      attendees: [], // New events start with no attendees
+      attendanceCount: 0, // New events start with 0 attendance count
       isBookmarked: false,
     };
 
@@ -105,10 +100,10 @@ export default function CreateEventPage() {
 
     toast({
       title: '🎉 Event Created!',
-      description: `${data.title} has been successfully created and added to Explore.`,
+      description: `${data.title} has been successfully created and added. Check Explore!`,
     });
-    reset(); 
-    setImagePreview(null); 
+    reset();
+    setImagePreview(null);
     setSelectedFile(null);
     // router.push('/explore'); // Optional: redirect after creation
   }
@@ -125,7 +120,7 @@ export default function CreateEventPage() {
 
       <div className="container mx-auto max-w-2xl p-4 sm:p-6">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-          
+
           <div className="space-y-2">
             <Label htmlFor="title" className="flex items-center text-base font-semibold">
               <FileText className="mr-2 h-5 w-5 text-primary" /> Event Title
@@ -187,7 +182,7 @@ export default function CreateEventPage() {
               {errors.time && <p className="text-sm text-destructive">{errors.time.message}</p>}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="location" className="flex items-center text-base font-semibold">
@@ -239,7 +234,7 @@ export default function CreateEventPage() {
               {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="eventImageFile" className="flex items-center text-base font-semibold">
               <UploadCloud className="mr-2 h-5 w-5 text-primary" /> Event Image
@@ -288,4 +283,3 @@ export default function CreateEventPage() {
     </div>
   );
 }
-
