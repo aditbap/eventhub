@@ -7,9 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EventCard } from '@/components/events/EventCard';
 import { CategoryFilter } from '@/components/events/CategoryFilter';
-import { SearchIcon, SlidersHorizontal, Menu, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight } from 'lucide-react';
+import { SearchIcon, SlidersHorizontal, Menu, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight, X } from 'lucide-react';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from 'next/link';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label'; // For future filter controls
 
 // Mock data for events - extended with attendees
 const MOCK_EVENTS: Event[] = [
@@ -183,10 +193,11 @@ const MOCK_EVENTS: Event[] = [
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All'); // Default to All
+  const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All');
   const [location, setLocation] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   useEffect(() => {
     setLoadingLocation(true);
@@ -269,7 +280,12 @@ export default function ExplorePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Button variant="ghost" className="text-primary p-2.5 rounded-md hover:bg-primary/10 h-9 w-9">
+            <Button 
+              variant="ghost" 
+              className="text-primary p-2.5 rounded-md hover:bg-primary/10 h-9 w-9"
+              onClick={() => setIsFilterSheetOpen(true)}
+              aria-label="Open filters"
+            >
               <SlidersHorizontal className="h-5 w-5" />
             </Button>
           </div>
@@ -322,6 +338,49 @@ export default function ExplorePage() {
           </section>
         </div>
       </main>
+
+      <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+        <SheetContent className="w-[320px] sm:w-[400px]">
+          <SheetHeader className="mb-6">
+            <SheetTitle>Filters</SheetTitle>
+            <SheetDescription>
+              Refine your event search using the options below.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="space-y-6">
+            {/* Placeholder for filter options */}
+            <div className="space-y-2">
+              <Label htmlFor="filter-date">Date Range</Label>
+              <Input id="filter-date" placeholder="Select dates (e.g., DatePicker)" disabled />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="filter-price">Price Range</Label>
+              <Input id="filter-price" placeholder="e.g., Free, $0-$20 (e.g., Slider)" disabled />
+            </div>
+             <div className="space-y-2">
+              <Label htmlFor="filter-location">Specific Location</Label>
+              <Input id="filter-location" placeholder="e.g., Enter a specific venue or area" disabled />
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              (More filter controls will be added here)
+            </p>
+          </div>
+          <SheetFooter className="mt-8">
+            <Button variant="outline" onClick={() => setIsFilterSheetOpen(false)} className="w-full sm:w-auto">
+              Clear Filters
+            </Button>
+            <Button onClick={() => setIsFilterSheetOpen(false)} className="w-full sm:w-auto">
+              Apply Filters
+            </Button>
+          </SheetFooter>
+           <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+              <X className="h-5 w-5" />
+              <span className="sr-only">Close</span>
+            </SheetClose>
+        </SheetContent>
+      </Sheet>
+
     </div>
   );
 }
+
