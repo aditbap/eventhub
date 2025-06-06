@@ -25,7 +25,8 @@ export interface User {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  // birthDate is not part of the core User object in context for now
+  // birthDate and gender are not part of the core User object in context for now
+  // They are fetched and managed in the SettingsPage directly or via specific update functions
 }
 
 interface AuthContextType {
@@ -38,6 +39,7 @@ interface AuthContextType {
   updateUserName: (newName: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   updateUserBirthDate: (newBirthDate: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
+  updateUserGender: (newGender: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -148,7 +150,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             ...googleUserData,
             displayName: firebaseUser.displayName || userDoc.data()?.displayName || null,
             photoURL: firebaseUser.photoURL || userDoc.data()?.photoURL || null,
-            updatedAt: serverTimestamp(), // ensure updatedAt is updated
+            updatedAt: serverTimestamp(),
           });
         }
         setUser({
@@ -209,39 +211,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.time("updateUserNameFirebase");
 
     try {
-      // Step 1: Update Firebase Auth profile
       console.log("updateUserName: Attempting to update Firebase Auth profile...");
-      await updateProfile(currentUser, { displayName: trimmedNewName });
-      console.log("updateUserName: Firebase Auth profile updated successfully.");
+      const authUpdatePromise = updateProfile(currentUser, { displayName: trimmedNewName });
+      console.log("updateUserName: Firebase Auth profile update initiated.");
 
-      // Step 2: Update/Create Firestore document
       const userDocRef = doc(db, "users", currentUser.uid);
       console.log(`updateUserName: Checking Firestore document at users/${currentUser.uid}...`);
+      
       const docSnap = await getDoc(userDocRef);
-
-      const userDataToUpdate = {
+      
+      const firestoreData = {
         displayName: trimmedNewName,
-        // Preserve existing photoURL and email from auth, or null if not present
-        photoURL: currentUser.photoURL || null, 
+        photoURL: currentUser.photoURL || null,
         email: currentUser.email || null,
         updatedAt: serverTimestamp()
       };
 
+      let firestoreUpdatePromise;
       if (docSnap.exists()) {
-        console.log("updateUserName: Firestore document exists. Updating with new name and updatedAt...");
-        await updateDoc(userDocRef, userDataToUpdate);
-        console.log("updateUserName: Firestore document updated successfully.");
+        console.log("updateUserName: Firestore document exists. Updating...");
+        firestoreUpdatePromise = updateDoc(userDocRef, firestoreData);
       } else {
         console.warn(`updateUserName: Firestore document users/${currentUser.uid} not found. Creating document.`);
-        await setDoc(userDocRef, {
-          uid: currentUser.uid,
-          ...userDataToUpdate, // This includes displayName, photoURL, email, updatedAt
-          createdAt: serverTimestamp() // Add createdAt for new document
+        firestoreUpdatePromise = setDoc(userDocRef, {
+          ...firestoreData,
+          uid: currentUser.uid, // Ensure UID is set on creation
+          createdAt: serverTimestamp()
         });
-        console.log("updateUserName: Firestore document created successfully.");
       }
+      console.log("updateUserName: Firestore operation (update/set) initiated.");
+
+      await Promise.all([authUpdatePromise, firestoreUpdatePromise]);
+      console.log("updateUserName: Both Firebase Auth and Firestore updates completed.");
       
-      // Update local AuthContext state
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName, photoURL: currentUser.photoURL } : null);
       
       console.timeEnd("updateUserNameFirebase");
@@ -251,13 +253,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.timeEnd("updateUserNameFirebase");
       console.warn(`AuthContext: Failed to update user name. Error Code: ${err.code}, Message: ${err.message}`, err);
       let errorMessage = "Could not update name. Please try again.";
-      // Provide more specific error messages if possible
       if (err.message) {
         errorMessage = err.message;
       }
       return { success: false, error: { message: errorMessage, code: err.code } };
     }
-  }, [db]); // Added db to dependency array
+  }, [db]);
   
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
     const currentUser = auth.currentUser;
@@ -300,9 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser) {
       return { success: false, error: { message: "No user logged in." } };
     }
-    // Optional: Add validation for newBirthDate format if needed
-    // e.g., if (!/^\d{4}-\d{2}-\d{2}$/.test(newBirthDate)) return { success: false, error: { message: "Invalid date format. Use YYYY-MM-DD." } };
-
+    
     console.log(`updateUserBirthDate: Attempting to update birth date for UID: ${currentUser.uid} to "${newBirthDate}"`);
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
@@ -317,8 +316,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await updateDoc(userDocRef, birthDateData);
         console.log("updateUserBirthDate: Firestore document updated successfully.");
       } else {
-        // If user document doesn't exist, create it with all available info
-        console.warn(`updateUserBirthDate: Firestore document users/${currentUser.uid} not found. Creating document.`);
+        console.warn(`updateUserBirthDate: Firestore document users/${currentUser.uid} not found. Creating document with birth date.`);
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           displayName: currentUser.displayName || null,
@@ -327,7 +325,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ...birthDateData,
           createdAt: serverTimestamp()
         });
-        console.log("updateUserBirthDate: Firestore document created successfully.");
+        console.log("updateUserBirthDate: Firestore document created with birth date successfully.");
       }
       return { success: true };
     } catch (err: any) {
@@ -335,6 +333,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: err.message || "Could not update birth date.", code: err.code } };
     }
   }, [db]);
+
+  const updateUserGender = useCallback(async (newGender: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { success: false, error: { message: "No user logged in." } };
+    }
+    
+    console.log(`updateUserGender: Attempting to update gender for UID: ${currentUser.uid} to "${newGender}"`);
+    try {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const docSnap = await getDoc(userDocRef);
+
+      const genderData = {
+        gender: newGender,
+        updatedAt: serverTimestamp()
+      };
+
+      if (docSnap.exists()) {
+        await updateDoc(userDocRef, genderData);
+        console.log("updateUserGender: Firestore document updated successfully.");
+      } else {
+        console.warn(`updateUserGender: Firestore document users/${currentUser.uid} not found. Creating document with gender.`);
+        await setDoc(userDocRef, {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || null,
+          email: currentUser.email || null,
+          photoURL: currentUser.photoURL || null,
+          ...genderData,
+          createdAt: serverTimestamp()
+        });
+        console.log("updateUserGender: Firestore document created with gender successfully.");
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.warn(`AuthContext: Failed to update user gender. Error Code: ${err.code}, Message: ${err.message}`, err);
+      return { success: false, error: { message: err.message || "Could not update gender.", code: err.code } };
+    }
+  }, [db]);
+
 
   useEffect(() => {
     const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings'];
@@ -346,8 +383,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loading, pathname, router]);
 
   useEffect(() => {
+    // Pages that authenticated users should be redirected away from
     const authPagesForRedirect = ['/login', '/register', '/reset-password']; 
-    // Note: '/new-password' was removed to allow access when logged in for changing current password
+    
     if (!loading && user && (authPagesForRedirect.includes(pathname) || pathname === '/')) {
       router.replace('/explore');
     }
@@ -355,7 +393,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName, changePassword, updateUserBirthDate }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, updateUserName, changePassword, updateUserBirthDate, updateUserGender }}>
       {children}
     </AuthContext.Provider>
   );

@@ -11,7 +11,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { ChangeNameDialog } from '@/components/settings/ChangeNameDialog';
-import { ChangeBirthDateDialog } from '@/components/settings/ChangeBirthDateDialog'; // Import new dialog
+import { ChangeBirthDateDialog } from '@/components/settings/ChangeBirthDateDialog';
+import { ChangeGenderDialog } from '@/components/settings/ChangeGenderDialog'; // Import new dialog
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -52,33 +53,39 @@ const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, la
 
 
 export default function SettingsPage() {
-  const { user, loading, logout, updateUserName, updateUserBirthDate } = useAuth(); // Added updateUserBirthDate
+  const { user, loading, logout, updateUserName, updateUserBirthDate, updateUserGender } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isChangeNameDialogOpen, setIsChangeNameDialogOpen] = useState(false);
-  const [isChangeBirthDateDialogOpen, setIsChangeBirthDateDialogOpen] = useState(false); // State for new dialog
-  const [currentBirthDate, setCurrentBirthDate] = useState('N/A'); // State for current birth date
+  const [isChangeBirthDateDialogOpen, setIsChangeBirthDateDialogOpen] = useState(false);
+  const [isChangeGenderDialogOpen, setIsChangeGenderDialogOpen] = useState(false); // State for gender dialog
+  const [currentBirthDate, setCurrentBirthDate] = useState('N/A');
+  const [currentGender, setCurrentGender] = useState('N/A'); // State for current gender
 
-  // Fetch birth date when user is available
+  // Fetch user-specific data (birthDate, gender) from Firestore
   useEffect(() => {
-    const fetchUserBirthDate = async () => {
+    const fetchUserData = async () => {
       if (user) {
         try {
           const userDocRef = doc(db, 'users', user.uid);
           const docSnap = await getDoc(userDocRef);
-          if (docSnap.exists() && docSnap.data()?.birthDate) {
-            setCurrentBirthDate(docSnap.data()?.birthDate);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setCurrentBirthDate(data?.birthDate || 'N/A');
+            setCurrentGender(data?.gender || 'N/A');
           } else {
             setCurrentBirthDate('N/A');
+            setCurrentGender('N/A');
           }
         } catch (error) {
-          console.error("Error fetching birth date:", error);
+          console.error("Error fetching user data:", error);
           setCurrentBirthDate('N/A');
+          setCurrentGender('N/A');
         }
       }
     };
-    fetchUserBirthDate();
+    fetchUserData();
   }, [user]);
 
 
@@ -87,9 +94,7 @@ export default function SettingsPage() {
   }
   
   if (!user) { 
-    // This case should ideally be handled by AppLayout redirecting to /login
-    // but as a fallback or if routing is slow:
-    router.replace('/login'); // Ensure redirect if user is null post-loading
+    router.replace('/login');
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -103,12 +108,17 @@ export default function SettingsPage() {
     { icon: Mail, label: 'Email', value: user.email || 'N/A' }, 
     { icon: Lock, label: 'Change Password', value: '••••••••••••', href: '/new-password' }, 
     { 
-      icon: CalendarIcon, // Changed icon
+      icon: CalendarIcon,
       label: 'Day of birth', 
-      value: currentBirthDate, // Use state for value
-      onClick: () => setIsChangeBirthDateDialogOpen(true) // Add onClick
+      value: currentBirthDate,
+      onClick: () => setIsChangeBirthDateDialogOpen(true)
     }, 
-    { icon: GenderIcon, label: 'Gender', value: 'Male', href: '#' }, // Placeholder, can be functionalized
+    { 
+      icon: GenderIcon, 
+      label: 'Gender', 
+      value: currentGender, 
+      onClick: () => setIsChangeGenderDialogOpen(true) 
+    },
   ];
 
   const handleDeleteAccountConfirm = () => {
@@ -133,7 +143,7 @@ export default function SettingsPage() {
   const handleSaveBirthDate = async (newBirthDate: string) => {
     const result = await updateUserBirthDate(newBirthDate);
     if (result.success) {
-      setCurrentBirthDate(newBirthDate); // Update local state for display
+      setCurrentBirthDate(newBirthDate);
       toast({
         title: "Birth Date Updated",
         description: "Your birth date has been successfully updated.",
@@ -141,6 +151,20 @@ export default function SettingsPage() {
       });
     } else {
       throw new Error(result.error?.message || "Failed to update birth date. Please try again.");
+    }
+  };
+
+  const handleSaveGender = async (newGender: string) => {
+    const result = await updateUserGender(newGender);
+    if (result.success) {
+      setCurrentGender(newGender);
+      toast({
+        title: "Gender Updated",
+        description: "Your gender has been successfully updated.",
+        action: <CheckCircle className="h-5 w-5 text-green-500" />,
+      });
+    } else {
+      throw new Error(result.error?.message || "Failed to update gender. Please try again.");
     }
   };
 
@@ -232,8 +256,15 @@ export default function SettingsPage() {
       <ChangeBirthDateDialog
         isOpen={isChangeBirthDateDialogOpen}
         onClose={() => setIsChangeBirthDateDialogOpen(false)}
-        currentBirthDate={currentBirthDate === 'N/A' ? '' : currentBirthDate} // Pass empty string if N/A
+        currentBirthDate={currentBirthDate === 'N/A' ? '' : currentBirthDate}
         onSave={handleSaveBirthDate}
+      />
+
+      <ChangeGenderDialog
+        isOpen={isChangeGenderDialogOpen}
+        onClose={() => setIsChangeGenderDialogOpen(false)}
+        currentGender={currentGender === 'N/A' ? '' : currentGender}
+        onSave={handleSaveGender}
       />
     </div>
   );
