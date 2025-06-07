@@ -43,7 +43,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
       { id: 'a2', avatarUrl: 'https://placehold.co/32x32.png?text=U2', name: 'User Two' },
       { id: 'a3', avatarUrl: 'https://placehold.co/32x32.png?text=U3', name: 'User Three' },
     ],
-    isBookmarked: false,
+    isBookmarked: false, // Changed to false
   },
   {
     id: '2',
@@ -62,7 +62,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
       { id: 'b1', avatarUrl: 'https://placehold.co/32x32.png?text=S1', name: 'Student Alpha' },
       { id: 'b2', avatarUrl: 'https://placehold.co/32x32.png?text=S2', name: 'Student Beta' },
     ],
-    isBookmarked: true,
+    isBookmarked: false, // Changed to false
   },
   {
     id: '3',
@@ -77,7 +77,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'charity run marathon',
     attendanceCount: 530,
     price: 10,
-    isBookmarked: false,
+    isBookmarked: false, // Changed to false
   },
    {
     id: '4',
@@ -97,7 +97,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
       { id: 'c3', avatarUrl: 'https://placehold.co/32x32.png?text=T3', name: 'Techie C' },
       { id: 'c4', avatarUrl: 'https://placehold.co/32x32.png?text=T4', name: 'Techie D' },
     ],
-    isBookmarked: true,
+    isBookmarked: false, // Changed to false
   },
   {
     id: '5',
@@ -111,7 +111,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'open mic cafe',
     attendanceCount: 95,
     price: 0,
-    isBookmarked: false,
+    isBookmarked: false, // Changed to false
   },
   {
     id: '6',
@@ -126,7 +126,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     attendanceCount: 600,
     price: 5,
     attendees: [ ],
-    isBookmarked: true,
+    isBookmarked: false, // Changed to false
   },
   // --- NEW DUMMY EVENTS FOR UPCOMING/NEAR YOU ---
   {
@@ -157,7 +157,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     attendanceCount: 0, // No attendees yet
     attendees: [],
     price: 15,
-    isBookmarked: true,
+    isBookmarked: false, // Changed to false
   },
   {
     id: 'event-nearyou-upcoming-3',
@@ -247,3 +247,4 @@ export const eventStore = {
     return () => subscribers.delete(callback); // Unsubscribe function
   },
 };
+
