@@ -24,13 +24,13 @@ import { useRouter } from 'next/navigation';
 import { eventStore } from '@/lib/eventStore';
 
 export default function ExplorePage() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(''); // Used for input value and redirect query
   const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All');
-  const [userLocation, setUserLocation] = useState<string | null>(null); // Renamed for clarity
+  const [userLocation, setUserLocation] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
 
   const [allEvents, setAllEvents] = useState<Event[]>(() => eventStore.getEvents());
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [eventsForDisplay, setEventsForDisplay] = useState<Event[]>([]); // Renamed from filteredEvents
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const router = useRouter();
 
@@ -49,17 +49,17 @@ export default function ExplorePage() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           () => {
-            setUserLocation('Bintaro'); // Hardcoded for now, replace with actual location data if available
+            setUserLocation('Bintaro'); 
             setLoadingLocation(false);
           },
           () => {
-            setUserLocation('Bintaro'); // Fallback
+            setUserLocation('Bintaro'); 
             setLoadingLocation(false);
           },
           { timeout: 3000 }
         );
       } else {
-        setUserLocation('Bintaro'); // Fallback
+        setUserLocation('Bintaro'); 
         setLoadingLocation(false);
       }
     }, 500);
@@ -68,43 +68,37 @@ export default function ExplorePage() {
   useEffect(() => {
     let eventsToFilter = [...allEvents];
 
+    // Filter only by category for local display on Explore page
     if (currentCategory !== 'All') {
       eventsToFilter = eventsToFilter.filter(event => event.category === currentCategory);
     }
-
-    if (searchQuery) {
-      eventsToFilter = eventsToFilter.filter(event =>
-        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        event.description.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+    
     eventsToFilter.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    setFilteredEvents(eventsToFilter);
-  }, [allEvents, searchQuery, currentCategory]);
+    setEventsForDisplay(eventsToFilter);
+  }, [allEvents, currentCategory]); // searchQuery removed from dependencies for local filtering
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize to start of today
+  today.setHours(0, 0, 0, 0); 
 
   const sevenDaysFromNowTarget = new Date();
-  sevenDaysFromNowTarget.setDate(sevenDaysFromNowTarget.getDate() + 7); // Date 7 days from today
-  sevenDaysFromNowTarget.setHours(23, 59, 59, 999); // Normalize to end of the 7th day from today
+  sevenDaysFromNowTarget.setDate(sevenDaysFromNowTarget.getDate() + 7); 
+  sevenDaysFromNowTarget.setHours(23, 59, 59, 999);
 
-  const upcomingEvents = filteredEvents
+  const upcomingEvents = eventsForDisplay // Use eventsForDisplay (category-filtered only)
     .filter(event => {
       const eventDate = new Date(event.date);
-      // eventDate is already at midnight local time due to "YYYY-MM-DD" format
       return eventDate >= today &&
              eventDate <= sevenDaysFromNowTarget;
     })
     .slice(0, 5);
 
-  const nearYouEvents = filteredEvents
+  const nearYouEvents = eventsForDisplay // Use eventsForDisplay (category-filtered only)
     .filter(e => {
       const eventDate = new Date(e.date);
-      const isUpcoming = eventDate >= today; // Check if event is today or in the future
+      const isUpcoming = eventDate >= today; 
       const hasFewOrNoAttendees = !e.attendees || e.attendees.length === 0;
       const isLocationMatch = userLocation && e.location && e.location.toLowerCase().includes(userLocation.toLowerCase());
-      return isUpcoming && isLocationMatch && hasFewOrNoAttendees; // Prioritize location match for new/less crowded events
+      return isUpcoming && isLocationMatch && hasFewOrNoAttendees; 
     })
     .slice(0, 5);
 
@@ -113,7 +107,7 @@ export default function ExplorePage() {
     if (searchQuery.trim()) {
       router.push(`/events?search=${encodeURIComponent(searchQuery.trim())}`);
     } else {
-      router.push('/events'); // Go to events page without search if query is empty
+      router.push('/events'); 
     }
   };
 
@@ -157,7 +151,7 @@ export default function ExplorePage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <Button
-              type="button" // Important: type="button" to prevent form submission by this button
+              type="button" 
               variant="ghost"
               className="text-primary p-2.5 rounded-md hover:bg-primary/10 h-9 w-9"
               onClick={() => setIsFilterSheetOpen(true)}
@@ -192,7 +186,7 @@ export default function ExplorePage() {
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No upcoming events found for this category or search.</p>
+              <p className="text-muted-foreground text-center py-4">No upcoming events found for this category.</p>
             )}
           </section>
 
@@ -210,7 +204,7 @@ export default function ExplorePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No events found near you for this category or search.</p>
+              <p className="text-muted-foreground text-center py-4">No events found near you for this category.</p>
             )}
           </section>
         </div>
@@ -259,5 +253,3 @@ export default function ExplorePage() {
     </div>
   );
 }
-
-    
