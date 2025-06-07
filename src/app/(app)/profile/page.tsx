@@ -197,7 +197,7 @@ export default function ProfilePage() {
       </div>
 
       <section className="px-4 pb-20 -mt-2">
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 mb-6">
           <ProfileMenuItem 
             icon={TicketIconLucide} 
             label="My Tickets" 
@@ -221,3 +221,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
