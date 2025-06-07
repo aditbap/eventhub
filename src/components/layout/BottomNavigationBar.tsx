@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, type Icon } from 'lucide-react'; // Removed MapPin
+import { Compass, CalendarDays, Plus, UserCircle, MapPin, type Icon } from 'lucide-react'; // Added MapPin back
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
-  // { href: '/map', label: 'Map', icon: MapPin }, // Removed Map item
+  { href: '/map', label: 'Map', icon: MapPin }, // Added Map item back
   { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
@@ -54,7 +54,7 @@ export function BottomNavigationBar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5', // Adjusted width to w-1/4 since there are 4 items now
+                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5', // Adjusted width back to w-1/5 for 5 items
                 isActive && 'text-primary'
               )}
               aria-label={item.label}
@@ -70,4 +70,3 @@ export function BottomNavigationBar() {
     </nav>
   );
 }
-
