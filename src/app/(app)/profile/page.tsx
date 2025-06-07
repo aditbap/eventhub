@@ -5,13 +5,13 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import type { Ticket } from '@/types';
 import { Button } from '@/components/ui/button';
-import { TicketCard } from '@/components/profile/TicketCard';
+// TicketCard removed as tickets are moved to a new page
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, deleteDoc, doc as firestoreDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'; // deleteDoc and firestoreDoc removed
 import { useRouter } from 'next/navigation';
-import { TicketDetailsDialog } from '@/components/profile/TicketDetailsDialog';
+// TicketDetailsDialog and related hooks/functions removed
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
@@ -63,12 +63,9 @@ const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading } = useAuth();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [tickets, setTickets] = useState<Ticket[]>([]); // Still needed for count
+  const [loadingTickets, setLoadingTickets] = useState(true); // Still needed for count loading state
   const router = useRouter();
-
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -103,16 +100,14 @@ export default function ProfilePage() {
               purchaseDate: purchaseDateStr,
             } as Ticket;
           });
+          // Sorting might not be strictly necessary here if only count is used, but keeping it doesn't harm
           userTickets.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
           setTickets(userTickets);
 
         } catch (error: any) {
-          console.error('Error fetching tickets:', error);
-          toast({
-            title: "Error Fetching Tickets",
-            description: error.message || "Could not load your tickets. Please try again later.",
-            variant: "destructive",
-          });
+          console.error('Error fetching tickets for count:', error);
+          // Toast for error while fetching count can be added if desired
+          // For now, we just log it as primary display is on another page.
         } finally {
           setLoadingTickets(false);
         }
@@ -123,35 +118,6 @@ export default function ProfilePage() {
     }
   }, [user, toast]);
 
-  const handleOpenTicketDialog = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setIsTicketDialogOpen(true);
-  };
-
-  const handleCloseTicketDialog = () => {
-    setSelectedTicket(null);
-    setIsTicketDialogOpen(false);
-  };
-
-  const handleDeleteTicket = async (ticketId: string) => {
-    if (!user) return;
-    try {
-      await deleteDoc(firestoreDoc(db, 'userTickets', ticketId));
-      setTickets(prevTickets => prevTickets.filter(t => t.id !== ticketId));
-      toast({
-        title: "Ticket Deleted",
-        description: "Your ticket has been successfully removed.",
-      });
-      handleCloseTicketDialog();
-    } catch (error) {
-      console.error("Error deleting ticket:", error);
-      toast({
-        title: "Error",
-        description: "Could not delete your ticket. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   if (authLoading || !user) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -200,7 +166,6 @@ export default function ProfilePage() {
             Settings
           </Button>
 
-          {/* Stats Section */}
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
             <StatItem value="0" label="Post" />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
@@ -213,7 +178,12 @@ export default function ProfilePage() {
 
       <section className="px-4 pb-20 -mt-2">
         <div className="space-y-3 mb-6">
-          {/* My Ticket menu item removed as per request */}
+          <ProfileMenuItem 
+            icon={TicketIconLucide} 
+            label="My Tickets" 
+            count={loadingTickets ? undefined : tickets.length} // Show count, or nothing if loading
+            href="/profile/my-tickets" // Link to the new page
+          />
           <ProfileMenuItem 
             icon={CalendarDays} 
             label="My Events" 
@@ -228,38 +198,11 @@ export default function ProfilePage() {
           />
         </div>
         
-        {/* Ticket List Section */}
-        {loadingTickets ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : tickets.length > 0 ? (
-          <div className="space-y-4">
-            {tickets.map((ticket) => (
-              <TicketCard
-                key={ticket.id}
-                ticket={ticket}
-                onClick={() => handleOpenTicketDialog(ticket)}
-              />
-            ))}
-          </div>
-        ) : (
-          !loadingTickets && (
-            <div className="text-center py-10 bg-card rounded-xl shadow-sm mt-4">
-              <TicketIconLucide className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">You have no tickets yet.</p>
-              <p className="text-sm text-muted-foreground">Explore events and get yours!</p>
-            </div>
-          )
-        )}
+        {/* Ticket List Section and "No tickets" message removed from here */}
+        
       </section>
 
-      <TicketDetailsDialog
-        isOpen={isTicketDialogOpen}
-        onClose={handleCloseTicketDialog}
-        ticket={selectedTicket}
-        onDeleteTicket={handleDeleteTicket}
-      />
+      {/* TicketDetailsDialog removed from here */}
     </div>
   );
 }
