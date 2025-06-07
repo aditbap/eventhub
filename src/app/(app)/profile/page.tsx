@@ -145,7 +145,7 @@ export default function ProfilePage() {
     if (!user) return;
     const result = await updateUserBio(newBio);
     if (result.success) {
-      setCurrentUserBio(newBio); // Update local state
+      setCurrentUserBio(newBio); // Update local state to reflect change immediately
       toast({
         title: "Bio Updated",
         description: "Your bio has been successfully updated.",
