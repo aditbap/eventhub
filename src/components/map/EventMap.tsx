@@ -59,7 +59,7 @@ let globalInstanceCounter = 0;
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  const [mapContainerKey] = useState(() => `map-container-${globalInstanceCounter++}-${Date.now()}`);
+  const [mapContainerKey, setMapContainerKey] = useState(() => `map-container-${globalInstanceCounter++}-${Date.now()}`);
   const [clientRenderComplete, setClientRenderComplete] = useState(false);
 
   useEffect(() => {
@@ -70,23 +70,23 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
     return () => {
       clearTimeout(timerId);
       if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
+        mapRef.current.remove(); // Explicitly destroy the Leaflet map instance
+        mapRef.current = null;   // Nullify the ref
       }
-      // Reset clientRenderComplete to ensure MapContainer is fully unmounted
-      // especially important for React StrictMode's double effect invocation.
-      setClientRenderComplete(false);
+      setClientRenderComplete(false); // Reset client rendering state
+      // Force a new key for MapContainer on the next mount (e.g., by StrictMode)
+      // This ensures React gives Leaflet a completely fresh DOM element.
+      setMapContainerKey(`map-container-${globalInstanceCounter++}-${Date.now()}`);
     };
-  }, []); // Empty dependency array: runs once on mount, cleanup on unmount (and for StrictMode cycles)
+  }, []); // Empty dependency array: runs on mount, cleanup on unmount (and StrictMode cycles)
 
   if (!clientRenderComplete) {
-    // The dynamic import's loading prop in MapPage.tsx will handle the visual loading state.
-    return null; 
+    return null;
   }
 
   return (
     <MapContainer
-      key={mapContainerKey} 
+      key={mapContainerKey} // Key now changes on remount after cleanup
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
