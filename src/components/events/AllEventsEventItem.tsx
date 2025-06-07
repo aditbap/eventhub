@@ -3,9 +3,11 @@
 
 import type { Event } from '@/types';
 import Image from 'next/image';
-import { MapPin } from 'lucide-react';
+import { MapPin, Bookmark } from 'lucide-react'; // Added Bookmark
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button'; // Added Button
 import { cn } from '@/lib/utils';
+import { eventStore } from '@/lib/eventStore'; // Added eventStore
 
 interface AllEventsEventItemProps {
   event: Event;
@@ -26,8 +28,8 @@ const formatEventDateTime = (dateStr: string, timeStr?: string): string => {
       const h = parseInt(hours, 10);
       const m = parseInt(minutes, 10);
       if (!isNaN(h) && !isNaN(m)) {
-        const d = new Date(0); // Use a base date
-        d.setUTCHours(h, m); // Set time as UTC to format correctly
+        const d = new Date(0); 
+        d.setUTCHours(h, m); 
         formattedTime = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }).replace(' ', '');
       } else {
         formattedTime = timeStr;
@@ -45,8 +47,14 @@ export function AllEventsEventItem({ event }: AllEventsEventItemProps) {
   const imageUrl = event.imageUrl || `https://placehold.co/80x80.png?text=${event.title.charAt(0)}`;
   const imageHint = event.imageHint || "event thumbnail";
 
+  const handleToggleBookmark = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    eventStore.toggleEventBookmark(event.id);
+  };
+
   return (
-    <Card className="flex items-center p-3 space-x-4 hover:shadow-md transition-shadow duration-200 rounded-xl cursor-pointer bg-card">
+    <Card className="flex items-center p-3 space-x-3 hover:shadow-md transition-shadow duration-200 rounded-xl cursor-pointer bg-card">
       <div className="relative w-20 h-20 flex-shrink-0">
         <Image
           src={imageUrl}
@@ -60,7 +68,7 @@ export function AllEventsEventItem({ event }: AllEventsEventItemProps) {
       <div className="flex-grow min-w-0">
         <p className={cn(
             "text-xs font-semibold mb-0.5 truncate",
-            new Date(event.date) < new Date() ? "text-muted-foreground" : "text-primary"
+            new Date(event.date) < new Date() && !event.date.startsWith(new Date().toISOString().split('T')[0]) ? "text-muted-foreground" : "text-primary"
           )}>
           {formattedDateTime}
         </p>
@@ -72,6 +80,15 @@ export function AllEventsEventItem({ event }: AllEventsEventItemProps) {
           <span className="truncate">{event.location}</span>
         </div>
       </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handleToggleBookmark}
+        className="ml-2 h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-primary"
+        aria-label={event.isBookmarked ? "Unbookmark event" : "Bookmark event"}
+      >
+        <Bookmark className={cn("h-5 w-5", event.isBookmarked ? "fill-primary text-primary" : "")} />
+      </Button>
     </Card>
   );
 }
