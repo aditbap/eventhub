@@ -91,9 +91,6 @@ export default function AllEventsPage() {
 
   const handleClearFiltersInSheet = () => {
     setTempFilters({ category: 'All' });
-    // Optionally, if you want clear to also apply immediately:
-    // setActiveFilters({ category: 'All' });
-    // setIsFilterSheetOpen(false);
   };
 
   const handleCategoryChangeInSheet = (category: string) => {
@@ -139,20 +136,20 @@ export default function AllEventsPage() {
       </header>
 
       <main className="flex-grow p-4 space-y-6 pb-20">
-        <div className="relative rounded-xl overflow-hidden shadow-lg bg-gradient-to-r from-green-400 to-emerald-500 p-6 text-white">
+        <div className="relative rounded-xl overflow-hidden shadow-lg bg-emerald-100 p-6">
           <div className="relative z-10">
-            <h2 className="text-2xl font-bold font-headline mb-1">Invite your friends</h2>
-            <p className="text-sm mb-4 opacity-90">Get #2000 for ticket</p>
+            <h2 className="text-2xl font-bold font-headline mb-1 text-emerald-800">Invite your friends</h2>
+            <p className="text-sm mb-4 text-emerald-700 opacity-90">Get #2000 for ticket</p>
             <Button
               variant="default"
-              className="bg-white text-emerald-600 hover:bg-gray-100 font-semibold px-6 py-2.5 h-auto"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 py-2.5 h-auto"
               onClick={() => alert('Invite functionality to be implemented!')}
             >
               INVITE
             </Button>
           </div>
-          <Gift className="absolute right-4 top-1/2 -translate-y-1/2 h-20 w-20 text-white/30 opacity-50 transform rotate-12" />
-          <Ticket className="absolute left-4 bottom-2 h-16 w-16 text-white/20 opacity-40 transform -rotate-12" />
+          <Gift className="absolute right-4 top-1/2 -translate-y-1/2 h-20 w-20 text-emerald-400 opacity-50 transform rotate-12" />
+          <Ticket className="absolute left-4 bottom-2 h-16 w-16 text-emerald-300 opacity-40 transform -rotate-12" />
           <Image
             src="https://placehold.co/300x150.png"
             alt="Invite friends illustration"
