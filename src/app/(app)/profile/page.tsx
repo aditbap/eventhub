@@ -101,7 +101,7 @@ export default function ProfilePage() {
               purchaseDate: purchaseDateStr,
             } as Ticket;
           });
-          userTickets.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
+          // No need to sort here as tickets are not displayed directly
           setTickets(userTickets);
 
         } catch (error: any) {
@@ -197,7 +197,7 @@ export default function ProfilePage() {
       </div>
 
       <section className="px-4 pb-20 -mt-2">
-        <div className="space-y-3 mb-6">
+        <div className="space-y-4 mb-6">
           <ProfileMenuItem 
             icon={TicketIconLucide} 
             label="My Tickets" 
@@ -208,7 +208,7 @@ export default function ProfilePage() {
             icon={CalendarDays} 
             label="My Events" 
             count={loadingMyEvents ? undefined : myEventsCount} 
-            href="/profile/my-events" // Link to the new page
+            href="/profile/my-events"
           />
           <ProfileMenuItem 
             icon={Bookmark} 
