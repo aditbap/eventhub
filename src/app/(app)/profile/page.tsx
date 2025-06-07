@@ -7,14 +7,15 @@ import type { Ticket } from '@/types';
 import { Button } from '@/components/ui/button';
 import { TicketCard } from '@/components/profile/TicketCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, deleteDoc, doc as firestoreDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { TicketDetailsDialog } from '@/components/profile/TicketDetailsDialog';
 import { useToast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card'; // Added Card
-import Link from 'next/link'; // Added Link
+import { Card } from '@/components/ui/card';
+import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -26,7 +27,7 @@ interface ProfileMenuItemProps {
 
 const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, count, href, onClick }) => {
   const content = (
-    <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer shadow-sm">
+    <Card className="p-4 hover:bg-muted/50 transition-colors cursor-pointer shadow-sm rounded-xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Icon className="h-6 w-6 mr-3 text-primary" />
@@ -46,6 +47,18 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
   }
   return <div className="w-full">{content}</div>; // Non-interactive version
 };
+
+interface StatItemProps {
+  value: string | number;
+  label: string;
+}
+
+const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
+  <div className="flex flex-col items-center">
+    <p className="text-xl font-semibold text-foreground">{value}</p>
+    <p className="text-xs text-muted-foreground">{label}</p>
+  </div>
+);
 
 
 export default function ProfilePage() {
@@ -145,7 +158,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen"> {/* Removed global gradient, will apply to top section */}
+    <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-transparent w-full">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-white/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
@@ -154,37 +167,57 @@ export default function ProfilePage() {
         <div className="w-9 h-9"></div> 
       </header>
 
-      {/* User Info Section with Gradient */}
       <div className="bg-gradient-to-b from-emerald-100/40 via-emerald-50/20 to-background/0 pt-2 pb-8 px-4">
-        <div className="flex flex-col items-center justify-center">
-          <div className="relative mb-3">
-            <Avatar className="h-28 w-28 border-4 border-white shadow-lg">
-              <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar"/>
-              <AvatarFallback className="text-4xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
+        <div className="flex flex-col items-center justify-center text-center">
+          <div className="relative mb-2">
+            <Avatar className="h-28 w-28 border-4 border-white shadow-lg rounded-2xl"> {/* Avatar shape updated */}
+              <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" className="rounded-2xl" />
+              <AvatarFallback className="text-4xl rounded-2xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="icon" className="absolute -bottom-1 -right-1 bg-background hover:bg-muted border-2 border-background h-9 w-9 rounded-full shadow-md" onClick={() => router.push('/settings')}>
-              <Pencil className="h-4 w-4 text-primary" />
+            <Button 
+              variant="default" 
+              size="icon" 
+              className="absolute bottom-0 right-0 bg-primary text-primary-foreground hover:bg-primary/90 h-8 w-8 rounded-full shadow-md border-2 border-background" 
+              onClick={() => router.push('/settings')}
+              aria-label="Edit profile"
+            >
+              <Pencil className="h-4 w-4" />
             </Button>
           </div>
-          <h2 className="text-2xl font-headline font-semibold text-foreground mb-2">{user.displayName || 'User Name'}</h2>
+          <h2 className="text-2xl font-headline font-semibold text-foreground mt-2">{user.displayName || 'User Name'}</h2>
+          <Button 
+            variant="link" 
+            className="text-sm text-muted-foreground hover:text-primary p-0 h-auto mt-1"
+            onClick={() => toast({ title: "Coming Soon!", description: "Adding a bio is not yet implemented."})}
+          >
+            <PlusCircle className="h-3.5 w-3.5 mr-1"/> Add Bio
+          </Button>
           <Button 
             variant="default" 
-            className="rounded-full bg-green-100 hover:bg-green-200 text-green-700 px-5 py-2 text-sm font-medium shadow"
+            className="rounded-full bg-primary/10 hover:bg-primary/20 text-primary px-6 py-2 text-sm font-semibold mt-3 shadow-sm"
             onClick={() => router.push('/settings')}
           >
             Settings
           </Button>
+
+          {/* Stats Section */}
+          <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
+            <StatItem value="0" label="Post" />
+            <Separator orientation="vertical" className="h-8 bg-border/70" />
+            <StatItem value="0" label="Following" /> 
+            <Separator orientation="vertical" className="h-8 bg-border/70" />
+            <StatItem value="0" label="Follower" />
+          </div>
         </div>
       </div>
 
-      {/* Menu Items and Tickets List Section */}
-      <section className="px-4 pb-20 -mt-4"> {/* Negative margin to slightly overlap gradient */}
+      <section className="px-4 pb-20 -mt-2">
         <div className="space-y-3 mb-6">
           <ProfileMenuItem 
             icon={TicketIconLucide} 
             label="My Ticket" 
             count={tickets.length} 
-            onClick={() => { /* Could scroll to tickets section or navigate if tickets were on another page */ }}
+            onClick={() => { /* Current behavior: tickets listed below */ }}
           />
           <ProfileMenuItem 
             icon={CalendarDays} 
@@ -195,12 +228,11 @@ export default function ProfilePage() {
           <ProfileMenuItem 
             icon={Bookmark} 
             label="Save" 
-            count={0} // Placeholder, replace with actual count if implemented
+            count={0} 
             onClick={() => toast({ title: "Coming Soon!", description: "Viewing saved items is not yet implemented."})}
           />
         </div>
         
-        {/* Actual List of Tickets */}
         {loadingTickets ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -216,7 +248,7 @@ export default function ProfilePage() {
             ))}
           </div>
         ) : (
-          !loadingTickets && ( // Only show "no tickets" if not loading AND tickets array is empty
+          !loadingTickets && (
             <div className="text-center py-10 bg-card rounded-xl shadow-sm mt-4">
               <TicketIconLucide className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground">You have no tickets yet.</p>
@@ -235,3 +267,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
