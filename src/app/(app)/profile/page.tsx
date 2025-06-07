@@ -6,15 +6,16 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Ticket, Event } from '@/types'; 
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, ListChecks } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { eventStore } from '@/lib/eventStore'; 
+import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog'; // Import the new dialog
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -61,13 +62,17 @@ const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
 
 
 export default function ProfilePage() {
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, loading: authLoading, updateUserBio } = useAuth(); // Added updateUserBio
   const [ticketsCount, setTicketsCount] = useState<number>(0); 
   const [myEventsCount, setMyEventsCount] = useState<number>(0); 
-  const [savedEventsCount, setSavedEventsCount] = useState<number>(0); // State for Saved Events count
+  const [savedEventsCount, setSavedEventsCount] = useState<number>(0); 
   const [loadingTickets, setLoadingTickets] = useState(true); 
   const [loadingMyEvents, setLoadingMyEvents] = useState(true); 
-  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true); // State for Saved Events loading
+  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true); 
+  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null); // State for bio
+  const [loadingBio, setLoadingBio] = useState(true); // State for bio loading
+  const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false); // State for dialog
+
   const router = useRouter();
   const { toast } = useToast();
 
@@ -83,11 +88,6 @@ export default function ProfilePage() {
           setTicketsCount(querySnapshot.docs.length);
         } catch (error: any) {
           console.error('Error fetching tickets for count:', error);
-          toast({
-            title: "Error Fetching Ticket Count",
-            description: error.message || "Could not load ticket count. Please try again.",
-            variant: "destructive",
-          });
         } finally {
           setLoadingTickets(false);
         }
@@ -99,32 +99,68 @@ export default function ProfilePage() {
         setLoadingMyEvents(true);
         setLoadingSavedEvents(true);
         const allEvents = eventStore.getEvents();
-        
         const userCreatedEvents = allEvents.filter(event => event.creatorId === user.uid);
         setMyEventsCount(userCreatedEvents.length);
         setLoadingMyEvents(false);
-
         const userSavedEvents = allEvents.filter(event => event.isBookmarked === true);
         setSavedEventsCount(userSavedEvents.length);
         setLoadingSavedEvents(false);
       };
-      
       const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
-      fetchEventCountsFromStore(); // Initial fetch
+      fetchEventCountsFromStore(); 
+
+      // Fetch Bio
+      const fetchUserBio = async () => {
+        setLoadingBio(true);
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            setCurrentUserBio(docSnap.data()?.bio || null);
+          } else {
+            setCurrentUserBio(null);
+          }
+        } catch (error) {
+          console.error("Error fetching user bio:", error);
+          setCurrentUserBio(null);
+        } finally {
+          setLoadingBio(false);
+        }
+      };
+      fetchUserBio();
 
       return () => {
-        unsubscribeEventStore(); // Cleanup subscription
+        unsubscribeEventStore(); 
       };
 
-    } else if (!authLoading) { // If not auth loading and no user
+    } else if (!authLoading) { 
       setLoadingTickets(false);
       setLoadingMyEvents(false);
       setLoadingSavedEvents(false);
+      setLoadingBio(false);
     }
-  }, [user, authLoading, toast]);
+  }, [user, authLoading]);
 
+  const handleSaveBio = async (newBio: string) => {
+    if (!user) return;
+    const result = await updateUserBio(newBio);
+    if (result.success) {
+      setCurrentUserBio(newBio); // Update local state
+      toast({
+        title: "Bio Updated",
+        description: "Your bio has been successfully updated.",
+      });
+    } else {
+      toast({
+        title: "Error Updating Bio",
+        description: result.error?.message || "Could not update your bio. Please try again.",
+        variant: "destructive",
+      });
+      throw new Error(result.error?.message || "Failed to update bio.");
+    }
+  };
 
-  if (authLoading || !user) { // Redirect handled by AppLayout, this is a fallback loader
+  if (authLoading || !user) { 
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -156,13 +192,30 @@ export default function ProfilePage() {
             </Button>
           </div>
           <h2 className="text-2xl font-headline font-semibold text-foreground mt-2">{user.displayName || 'User Name'}</h2>
-          <Button 
-            variant="link" 
-            className="text-sm text-muted-foreground hover:text-primary p-0 h-auto mt-1"
-            onClick={() => toast({ title: "Coming Soon!", description: "Adding a bio is not yet implemented."})}
-          >
-            <PlusCircle className="h-3.5 w-3.5 mr-1"/> Add Bio
-          </Button>
+          
+          {loadingBio ? (
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
+          ) : currentUserBio ? (
+            <div className="mt-1 text-sm text-muted-foreground text-center max-w-md px-4">
+              <p className="whitespace-pre-line break-words">{currentUserBio}</p>
+              <Button 
+                variant="link" 
+                className="text-xs text-primary hover:underline p-0 h-auto mt-0.5"
+                onClick={() => setIsChangeBioDialogOpen(true)}
+              >
+                <Edit3 className="h-3 w-3 mr-1"/> Edit Bio
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              variant="link" 
+              className="text-sm text-muted-foreground hover:text-primary p-0 h-auto mt-1"
+              onClick={() => setIsChangeBioDialogOpen(true)}
+            >
+              <PlusCircle className="h-3.5 w-3.5 mr-1"/> Add Bio
+            </Button>
+          )}
+
           <Button 
             variant="default" 
             className="rounded-full bg-primary/10 hover:bg-primary/20 text-primary px-6 py-2 text-sm font-semibold mt-3 shadow-sm"
@@ -199,10 +252,17 @@ export default function ProfilePage() {
             icon={Bookmark} 
             label="Saved Events" 
             count={loadingSavedEvents ? undefined : savedEventsCount} 
-            href="/profile/saved-events" // Updated href
+            href="/profile/saved-events" 
           />
         </div>
       </section>
+      
+      <ChangeBioDialog
+        isOpen={isChangeBioDialogOpen}
+        onClose={() => setIsChangeBioDialogOpen(false)}
+        currentBio={currentUserBio}
+        onSave={handleSaveBio}
+      />
     </div>
   );
 }
