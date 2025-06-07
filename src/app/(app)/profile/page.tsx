@@ -170,7 +170,7 @@ export default function ProfilePage() {
       <div className="bg-gradient-to-b from-emerald-100/40 via-emerald-50/20 to-background/0 pt-2 pb-8 px-4">
         <div className="flex flex-col items-center justify-center text-center">
           <div className="relative mb-2">
-            <Avatar className="h-28 w-28 border-4 border-white shadow-lg rounded-2xl"> {/* Avatar shape updated */}
+            <Avatar className="h-28 w-28 border-4 border-white shadow-lg rounded-2xl">
               <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" className="rounded-2xl" />
               <AvatarFallback className="text-4xl rounded-2xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
@@ -204,21 +204,16 @@ export default function ProfilePage() {
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
             <StatItem value="0" label="Post" />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem value="0" label="Following" /> 
+            <StatItem value="234" label="Following" /> 
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem value="0" label="Follower" />
+            <StatItem value="105" label="Follower" />
           </div>
         </div>
       </div>
 
       <section className="px-4 pb-20 -mt-2">
         <div className="space-y-3 mb-6">
-          <ProfileMenuItem 
-            icon={TicketIconLucide} 
-            label="My Ticket" 
-            count={tickets.length} 
-            onClick={() => { /* Current behavior: tickets listed below */ }}
-          />
+          {/* My Ticket menu item removed as per request */}
           <ProfileMenuItem 
             icon={CalendarDays} 
             label="My Events" 
@@ -233,6 +228,7 @@ export default function ProfilePage() {
           />
         </div>
         
+        {/* Ticket List Section */}
         {loadingTickets ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -267,4 +263,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
