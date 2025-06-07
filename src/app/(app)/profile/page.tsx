@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Ticket, Event } from '@/types'; // Added Event type
+import type { Ticket, Event } from '@/types'; 
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, ListChecks } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
-import { eventStore } from '@/lib/eventStore'; // Import eventStore
+import { eventStore } from '@/lib/eventStore'; 
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -62,48 +62,25 @@ const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading } = useAuth();
-  const [tickets, setTickets] = useState<Ticket[]>([]); 
-  const [myEventsCount, setMyEventsCount] = useState<number>(0); // State for My Events count
+  const [ticketsCount, setTicketsCount] = useState<number>(0); 
+  const [myEventsCount, setMyEventsCount] = useState<number>(0); 
+  const [savedEventsCount, setSavedEventsCount] = useState<number>(0); // State for Saved Events count
   const [loadingTickets, setLoadingTickets] = useState(true); 
-  const [loadingMyEvents, setLoadingMyEvents] = useState(true); // State for My Events loading
+  const [loadingMyEvents, setLoadingMyEvents] = useState(true); 
+  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true); // State for Saved Events loading
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
-      const fetchTickets = async () => {
+      // Fetch tickets count
+      const fetchTicketsCount = async () => {
         setLoadingTickets(true);
         try {
           const ticketsRef = collection(db, 'userTickets');
           const q = query(ticketsRef, where('userId', '==', user.uid));
           const querySnapshot = await getDocs(q);
-          
-          const userTickets: Ticket[] = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            let purchaseDateStr = '';
-            if (data.purchaseDate && data.purchaseDate instanceof Timestamp) {
-              purchaseDateStr = data.purchaseDate.toDate().toISOString();
-            } else if (typeof data.purchaseDate === 'string') {
-              purchaseDateStr = data.purchaseDate;
-            }
-
-            return {
-              id: doc.id,
-              userId: data.userId,
-              eventId: data.eventId,
-              eventName: data.eventName,
-              eventDate: data.eventDate,
-              eventTime: data.eventTime, 
-              eventLocation: data.eventLocation,
-              eventImageUrl: data.eventImageUrl, 
-              eventImageHint: data.eventImageHint,
-              qrCodeUrl: data.qrCodeUrl, 
-              purchaseDate: purchaseDateStr,
-            } as Ticket;
-          });
-          // No need to sort here as tickets are not displayed directly
-          setTickets(userTickets);
-
+          setTicketsCount(querySnapshot.docs.length);
         } catch (error: any) {
           console.error('Error fetching tickets for count:', error);
           toast({
@@ -115,31 +92,39 @@ export default function ProfilePage() {
           setLoadingTickets(false);
         }
       };
-      fetchTickets();
+      fetchTicketsCount();
 
-      const fetchMyEventsCount = () => {
+      // Fetch My Events count and Saved Events count from eventStore
+      const fetchEventCountsFromStore = () => {
         setLoadingMyEvents(true);
+        setLoadingSavedEvents(true);
         const allEvents = eventStore.getEvents();
+        
         const userCreatedEvents = allEvents.filter(event => event.creatorId === user.uid);
         setMyEventsCount(userCreatedEvents.length);
         setLoadingMyEvents(false);
+
+        const userSavedEvents = allEvents.filter(event => event.isBookmarked === true);
+        setSavedEventsCount(userSavedEvents.length);
+        setLoadingSavedEvents(false);
       };
       
-      const unsubscribeEventStore = eventStore.subscribe(fetchMyEventsCount);
-      fetchMyEventsCount(); // Initial fetch
+      const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
+      fetchEventCountsFromStore(); // Initial fetch
 
       return () => {
         unsubscribeEventStore(); // Cleanup subscription
       };
 
-    } else {
+    } else if (!authLoading) { // If not auth loading and no user
       setLoadingTickets(false);
       setLoadingMyEvents(false);
+      setLoadingSavedEvents(false);
     }
-  }, [user, toast]);
+  }, [user, authLoading, toast]);
 
 
-  if (authLoading || !user) {
+  if (authLoading || !user) { // Redirect handled by AppLayout, this is a fallback loader
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -201,7 +186,7 @@ export default function ProfilePage() {
           <ProfileMenuItem 
             icon={TicketIconLucide} 
             label="My Tickets" 
-            count={loadingTickets ? undefined : tickets.length}
+            count={loadingTickets ? undefined : ticketsCount}
             href="/profile/my-tickets" 
           />
           <ProfileMenuItem 
@@ -212,13 +197,12 @@ export default function ProfilePage() {
           />
           <ProfileMenuItem 
             icon={Bookmark} 
-            label="Save" 
-            count={0} 
-            onClick={() => toast({ title: "Coming Soon!", description: "Viewing saved items is not yet implemented."})}
+            label="Saved Events" 
+            count={loadingSavedEvents ? undefined : savedEventsCount} 
+            href="/profile/saved-events" // Updated href
           />
         </div>
       </section>
     </div>
   );
 }
-

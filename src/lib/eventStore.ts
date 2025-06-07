@@ -123,7 +123,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     category: 'Sports',
     imageUrl: 'https://placehold.co/1200x600.png',
     imageHint: 'basketball tournament sport',
-    attendanceCount: 600, 
+    attendanceCount: 600,
     price: 5,
     attendees: [ ],
     isBookmarked: true,
@@ -209,6 +209,10 @@ const MOCK_EVENTS_INITIAL: Event[] = [
 let eventsData: Event[] = [...MOCK_EVENTS_INITIAL];
 const subscribers: Set<() => void> = new Set();
 
+const notifySubscribers = () => {
+  subscribers.forEach(callback => callback());
+};
+
 export const eventStore = {
   getEvents: (): Event[] => {
     // Sort by date descending (newest first) initially
@@ -221,23 +225,25 @@ export const eventStore = {
         return numericId > max ? numericId : max;
     }, 0);
     
-    // Check if newEvent.id is already a string like 'event-upcoming-1' or numeric.
-    // This simple ID generation is mostly for events created via UI.
-    if (!newEvent.id.includes('-')) { // If it's purely numeric or Date.now() string
+    if (!newEvent.id.includes('-')) { 
         const newNumericId = (parseInt(newEvent.id, 10) > maxId) ? newEvent.id : (maxId + 1).toString();
         newEvent.id = newNumericId;
     }
-    // For IDs like 'event-new-xyz', this doesn't try to make them numeric.
 
     eventsData = [newEvent, ...eventsData];
-    subscribers.forEach(callback => callback());
+    notifySubscribers();
   },
   getEventById: (id: string): Event | undefined => {
     return eventsData.find(event => event.id === id);
+  },
+  toggleEventBookmark: (eventId: string): void => {
+    eventsData = eventsData.map(event =>
+      event.id === eventId ? { ...event, isBookmarked: !event.isBookmarked } : event
+    );
+    notifySubscribers();
   },
   subscribe: (callback: () => void): (() => void) => {
     subscribers.add(callback);
     return () => subscribers.delete(callback); // Unsubscribe function
   },
 };
-

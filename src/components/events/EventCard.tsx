@@ -8,8 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MapPinIcon, Bookmark, CalendarDays, DollarSign } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { eventStore } from '@/lib/eventStore'; // Import eventStore
 
 interface EventCardProps {
   event: Event;
@@ -17,24 +17,23 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
-  const [isBookmarked, setIsBookmarked] = useState(event.isBookmarked || false);
+  // Removed local isBookmarked state, will use event.isBookmarked directly from props
 
   const toggleBookmark = (e: React.MouseEvent) => {
     e.preventDefault(); 
     e.stopPropagation();
-    setIsBookmarked(!isBookmarked);
-    // API call to update bookmark status
+    eventStore.toggleEventBookmark(event.id); // Call eventStore method
   };
   
   const formatDate = (dateString: string, format: 'short' | 'overlay') => {
     const date = new Date(dateString);
     if (format === 'overlay') {
-      const day = date.toLocaleDateString('en-US', { day: 'numeric' });
-      const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+      const day = date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'UTC' }); // Ensure UTC for date part consistency
+      const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
       return { day, month };
     }
-    // 'short' format: 1ST JUNE - SAT -2:00 PM
-    const day = date.toLocaleDateString('en-US', { day: 'numeric' });
+    // 'short' format: 1ST JUNE - SAT - 2:00 PM
+    const dayOfMonth = date.getUTCDate(); // Use UTC date parts
     const suffix = (d: number) => {
       if (d > 3 && d < 21) return 'TH';
       switch (d % 10) {
@@ -44,10 +43,24 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
         default: return "TH";
       }
     };
-    const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-    const time = event.time ? ` - ${event.time}` : '';
-    return `${day}${suffix(parseInt(day))} ${month} - ${weekday}${time}`;
+    const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
+    
+    let formattedTime = 'Time TBD';
+    if (event.time) {
+      const [hours, minutes] = event.time.split(':');
+      const h = parseInt(hours, 10);
+      const m = parseInt(minutes, 10);
+      if (!isNaN(h) && !isNaN(m)) {
+        const tempDate = new Date(0);
+        tempDate.setUTCHours(h,m); // Assume event.time is in UTC for consistent display if it were actual UTC
+                                   // If event.time is local, this needs more timezone context
+        formattedTime = tempDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }).replace(' ', '');
+      } else {
+        formattedTime = event.time; // Fallback if time parsing fails
+      }
+    }
+    return `${dayOfMonth}${suffix(dayOfMonth)} ${month} - ${weekday}${event.time ? ` - ${formattedTime}` : ''}`;
   };
 
   const priceDisplay = event.price === 0 ? 'Free' : event.price ? `$${event.price}` : 'N/A';
@@ -76,8 +89,9 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
               size="icon" 
               onClick={toggleBookmark} 
               className="absolute top-3 right-3 h-9 w-9 bg-white/80 hover:bg-white rounded-lg shadow"
+              aria-label={event.isBookmarked ? "Unbookmark event" : "Bookmark event"}
             >
-              <Bookmark className={cn("h-5 w-5", isBookmarked ? "fill-primary text-primary" : "text-muted-foreground")} />
+              <Bookmark className={cn("h-5 w-5", event.isBookmarked ? "fill-primary text-primary" : "text-muted-foreground")} />
             </Button>
           </div>
           <CardContent className="p-3 flex-grow flex flex-col justify-between">
@@ -144,8 +158,9 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
             size="icon" 
             onClick={toggleBookmark} 
             className="ml-2 h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-primary"
+            aria-label={event.isBookmarked ? "Unbookmark event" : "Bookmark event"}
           >
-            <Bookmark className={cn("h-5 w-5", isBookmarked ? "fill-primary text-primary" : "")} />
+            <Bookmark className={cn("h-5 w-5", event.isBookmarked ? "fill-primary text-primary" : "")} />
           </Button>
         </Card>
       </Link>
