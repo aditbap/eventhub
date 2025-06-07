@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import type { Event } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -108,6 +108,15 @@ export default function ExplorePage() {
     })
     .slice(0, 5);
 
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/events?search=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      router.push('/events'); // Go to events page without search if query is empty
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-40">
@@ -138,7 +147,7 @@ export default function ExplorePage() {
           </Button>
         </div>
         <div className="container mx-auto -mb-10 relative z-10 mt-3">
-          <div className="bg-card p-1.5 rounded-xl shadow-lg flex items-center gap-2">
+          <form onSubmit={handleSearchSubmit} className="bg-card p-1.5 rounded-xl shadow-lg flex items-center gap-2">
             <SearchIcon className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
             <Input
               type="search"
@@ -148,6 +157,7 @@ export default function ExplorePage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <Button
+              type="button" // Important: type="button" to prevent form submission by this button
               variant="ghost"
               className="text-primary p-2.5 rounded-md hover:bg-primary/10 h-9 w-9"
               onClick={() => setIsFilterSheetOpen(true)}
@@ -155,7 +165,7 @@ export default function ExplorePage() {
             >
               <SlidersHorizontal className="h-5 w-5" />
             </Button>
-          </div>
+          </form>
         </div>
       </header>
 
@@ -249,3 +259,5 @@ export default function ExplorePage() {
     </div>
   );
 }
+
+    

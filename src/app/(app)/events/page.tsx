@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import type { Event } from '@/types';
 import { eventStore } from '@/lib/eventStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,8 +33,10 @@ const filterCategories: Array<{ value: Event['category'] | 'All', label: string 
   { value: 'Other', label: 'Other' },
 ];
 
-export default function AllEventsPage() {
+function EventsPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [allEvents, setAllEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [searchActive, setSearchActive] = useState(false);
@@ -48,6 +50,15 @@ export default function AllEventsPage() {
     const eventsFromStore = eventStore.getEvents(); // Already sorted by date desc
     setAllEvents(eventsFromStore);
   }, []);
+
+  // Effect to initialize searchQuery from URL
+  useEffect(() => {
+    const queryFromUrl = searchParams.get('search');
+    if (queryFromUrl) {
+      setSearchQuery(decodeURIComponent(queryFromUrl));
+      setSearchActive(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let currentEvents = [...allEvents];
@@ -77,6 +88,8 @@ export default function AllEventsPage() {
   const handleCloseSearchClick = () => {
     setSearchActive(false);
     setSearchQuery('');
+    // Optionally update URL to remove search param
+    router.replace('/events');
   };
 
   const handleFilterIconClick = () => {
@@ -235,3 +248,15 @@ export default function AllEventsPage() {
     </div>
   );
 }
+
+// It's good practice to wrap the page content in Suspense when using useSearchParams
+// as it might suspend during initial render or navigation.
+export default function AllEventsPage() {
+  return (
+    <Suspense fallback={<div>Loading search results...</div>}>
+      <EventsPageContent />
+    </Suspense>
+  );
+}
+
+    
