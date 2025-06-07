@@ -8,14 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore'; // Added getDoc
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { eventStore } from '@/lib/eventStore'; 
-import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog'; // Import the new dialog
+import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog'; 
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -62,16 +62,16 @@ const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
 
 
 export default function ProfilePage() {
-  const { user, logout, loading: authLoading, updateUserBio } = useAuth(); // Added updateUserBio
+  const { user, logout, loading: authLoading, updateUserBio } = useAuth(); 
   const [ticketsCount, setTicketsCount] = useState<number>(0); 
   const [myEventsCount, setMyEventsCount] = useState<number>(0); 
   const [savedEventsCount, setSavedEventsCount] = useState<number>(0); 
   const [loadingTickets, setLoadingTickets] = useState(true); 
   const [loadingMyEvents, setLoadingMyEvents] = useState(true); 
   const [loadingSavedEvents, setLoadingSavedEvents] = useState(true); 
-  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null); // State for bio
-  const [loadingBio, setLoadingBio] = useState(true); // State for bio loading
-  const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false); // State for dialog
+  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null); 
+  const [loadingBio, setLoadingBio] = useState(true); 
+  const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false); 
 
   const router = useRouter();
   const { toast } = useToast();
@@ -266,3 +266,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
