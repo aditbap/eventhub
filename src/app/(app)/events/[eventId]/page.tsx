@@ -78,7 +78,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         title: '🎉 Ticket Acquired!',
         description: `You've successfully got a ticket for ${event.title}.`,
         action: (
-          <Button variant="outline" size="sm" onClick={() => router.push('/profile')}>
+          <Button variant="outline" size="sm" onClick={() => router.push('/profile/my-tickets')}>
             View Ticket
           </Button>
         ),
@@ -241,7 +241,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             </div>
             <AlertDialogTitle className="text-center">Already Have a Ticket?</AlertDialogTitle>
             <AlertDialogDescription className="text-center">
-              You already have a ticket for "{event.title}". Would you like to get another one?
+              You already have a ticket for "{event?.title}". Would you like to get another one?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center">
@@ -262,5 +262,3 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
-
-    
