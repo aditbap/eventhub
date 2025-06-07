@@ -19,6 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 const createEventFormSchema = z.object({
   title: z.string().min(3, { message: 'Event title must be at least 3 characters.' }).max(100),
@@ -41,6 +42,7 @@ type CreateEventFormValues = z.infer<typeof createEventFormSchema>;
 export default function CreateEventPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const { user } = useAuth(); // Get current user
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset, setValue } = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventFormSchema),
     defaultValues: {
@@ -79,6 +81,15 @@ export default function CreateEventPage() {
   };
 
   async function onSubmit(data: CreateEventFormValues) {
+    if (!user) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to create an event.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const newEvent: Event = {
       id: Date.now().toString(),
       title: data.title,
@@ -91,16 +102,17 @@ export default function CreateEventPage() {
       price: data.price ?? 0,
       imageUrl: data.imageUrl,
       imageHint: data.imageHint,
-      attendees: [], // New events start with no attendees
-      attendanceCount: 0, // New events start with 0 attendance count
+      attendees: [], 
+      attendanceCount: 0, 
       isBookmarked: false,
+      creatorId: user.uid, // Add creatorId
     };
 
     eventStore.addEvent(newEvent);
 
     toast({
       title: '🎉 Event Created!',
-      description: `${data.title} has been successfully created and added. Check Explore!`,
+      description: `${data.title} has been successfully created. You can see it in My Events!`,
     });
     reset();
     setImagePreview(null);

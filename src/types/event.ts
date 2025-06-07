@@ -1,3 +1,4 @@
+
 export interface Attendee {
   id: string;
   avatarUrl: string;
@@ -19,4 +20,5 @@ export interface Event {
   attendees?: Attendee[]; // Array of attendee objects for avatars
   isBookmarked?: boolean; // client-side state
   price?: number; // Optional price
+  creatorId?: string; // UID of the user who created the event
 }

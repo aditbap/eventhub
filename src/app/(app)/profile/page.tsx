@@ -3,19 +3,18 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Ticket } from '@/types';
+import type { Ticket, Event } from '@/types'; // Added Event type
 import { Button } from '@/components/ui/button';
-// TicketCard removed as tickets are moved to a new page
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'; // deleteDoc and firestoreDoc removed
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
-// TicketDetailsDialog and related hooks/functions removed
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import { eventStore } from '@/lib/eventStore'; // Import eventStore
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -45,7 +44,7 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
   if (onClick) {
     return <button onClick={onClick} className="w-full text-left">{content}</button>;
   }
-  return <div className="w-full">{content}</div>; // Non-interactive version
+  return <div className="w-full">{content}</div>; 
 };
 
 interface StatItemProps {
@@ -63,8 +62,10 @@ const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading } = useAuth();
-  const [tickets, setTickets] = useState<Ticket[]>([]); // Still needed for count
-  const [loadingTickets, setLoadingTickets] = useState(true); // Still needed for count loading state
+  const [tickets, setTickets] = useState<Ticket[]>([]); 
+  const [myEventsCount, setMyEventsCount] = useState<number>(0); // State for My Events count
+  const [loadingTickets, setLoadingTickets] = useState(true); 
+  const [loadingMyEvents, setLoadingMyEvents] = useState(true); // State for My Events loading
   const router = useRouter();
   const { toast } = useToast();
 
@@ -100,21 +101,40 @@ export default function ProfilePage() {
               purchaseDate: purchaseDateStr,
             } as Ticket;
           });
-          // Sorting might not be strictly necessary here if only count is used, but keeping it doesn't harm
           userTickets.sort((a, b) => new Date(b.eventDate).getTime() - new Date(a.eventDate).getTime());
           setTickets(userTickets);
 
         } catch (error: any) {
           console.error('Error fetching tickets for count:', error);
-          // Toast for error while fetching count can be added if desired
-          // For now, we just log it as primary display is on another page.
+          toast({
+            title: "Error Fetching Ticket Count",
+            description: error.message || "Could not load ticket count. Please try again.",
+            variant: "destructive",
+          });
         } finally {
           setLoadingTickets(false);
         }
       };
       fetchTickets();
+
+      const fetchMyEventsCount = () => {
+        setLoadingMyEvents(true);
+        const allEvents = eventStore.getEvents();
+        const userCreatedEvents = allEvents.filter(event => event.creatorId === user.uid);
+        setMyEventsCount(userCreatedEvents.length);
+        setLoadingMyEvents(false);
+      };
+      
+      const unsubscribeEventStore = eventStore.subscribe(fetchMyEventsCount);
+      fetchMyEventsCount(); // Initial fetch
+
+      return () => {
+        unsubscribeEventStore(); // Cleanup subscription
+      };
+
     } else {
       setLoadingTickets(false);
+      setLoadingMyEvents(false);
     }
   }, [user, toast]);
 
@@ -181,14 +201,14 @@ export default function ProfilePage() {
           <ProfileMenuItem 
             icon={TicketIconLucide} 
             label="My Tickets" 
-            count={loadingTickets ? undefined : tickets.length} // Show count, or nothing if loading
-            href="/profile/my-tickets" // Link to the new page
+            count={loadingTickets ? undefined : tickets.length}
+            href="/profile/my-tickets" 
           />
           <ProfileMenuItem 
             icon={CalendarDays} 
             label="My Events" 
-            count={0} 
-            onClick={() => toast({ title: "Coming Soon!", description: "Viewing your created events is not yet implemented."})}
+            count={loadingMyEvents ? undefined : myEventsCount} 
+            href="/profile/my-events" // Link to the new page
           />
           <ProfileMenuItem 
             icon={Bookmark} 
@@ -197,12 +217,7 @@ export default function ProfilePage() {
             onClick={() => toast({ title: "Coming Soon!", description: "Viewing saved items is not yet implemented."})}
           />
         </div>
-        
-        {/* Ticket List Section and "No tickets" message removed from here */}
-        
       </section>
-
-      {/* TicketDetailsDialog removed from here */}
     </div>
   );
 }
