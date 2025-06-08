@@ -1,9 +1,7 @@
-
 'use client';
 
 import { BottomNavigationBar } from '@/components/layout/BottomNavigationBar';
-import { DesktopSidebar } from '@/components/layout/DesktopSidebar'; // New import
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'; // New imports for context and layout
+import { DesktopFloatingNav } from '@/components/layout/DesktopFloatingNav'; // New import
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -32,18 +30,19 @@ export default function AppLayout({
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen bg-background"> {/* Outer container */}
-        <DesktopSidebar />
-        {/* SidebarInset is a <main> tag by default.
-            pb-16 for mobile to avoid overlap with BottomNavigationBar.
-            md:pb-0 since BottomNavigationBar is hidden on desktop.
+    <> {/* Using React Fragment as the direct parent */}
+      <div className="flex flex-col min-h-screen bg-background"> {/* Main content container */}
+        {/* 
+          Adjusted padding-bottom for main content:
+          pb-16 for mobile (BottomNavigationBar height)
+          md:pb-24 for desktop (to give space for DesktopFloatingNav which is 'bottom-6' plus its height)
         */}
-        <SidebarInset className="flex-grow pb-16 md:pb-0">
+        <main className="flex-grow pb-16 md:pb-24"> 
           {children}
-        </SidebarInset>
+        </main>
       </div>
-      <BottomNavigationBar /> {/* Remains for mobile */}
-    </SidebarProvider>
+      <BottomNavigationBar /> {/* For mobile, hidden on md and up */}
+      <DesktopFloatingNav /> {/* For desktop, hidden on screens smaller than md */}
+    </>
   );
 }
