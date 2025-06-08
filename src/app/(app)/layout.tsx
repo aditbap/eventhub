@@ -1,8 +1,11 @@
+
 'use client';
 
 import { BottomNavigationBar } from '@/components/layout/BottomNavigationBar';
+import { DesktopSidebar } from '@/components/layout/DesktopSidebar'; // New import
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'; // New imports for context and layout
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation'; // Corrected import
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
@@ -29,11 +32,18 @@ export default function AppLayout({
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-grow pb-16 md:pb-0"> {/* Add padding-bottom for mobile nav */}
-        {children}
-      </main>
-      <BottomNavigationBar />
-    </div>
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen bg-background"> {/* Outer container */}
+        <DesktopSidebar />
+        {/* SidebarInset is a <main> tag by default.
+            pb-16 for mobile to avoid overlap with BottomNavigationBar.
+            md:pb-0 since BottomNavigationBar is hidden on desktop.
+        */}
+        <SidebarInset className="flex-grow pb-16 md:pb-0">
+          {children}
+        </SidebarInset>
+      </div>
+      <BottomNavigationBar /> {/* Remains for mobile */}
+    </SidebarProvider>
   );
 }
