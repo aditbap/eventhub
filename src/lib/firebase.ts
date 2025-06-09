@@ -11,12 +11,12 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage';
 // Anda bisa menemukan nilai-nilai ini di Firebase Console > Project settings > General > Your apps > Web app.
 // ==========================================================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY", // GANTI DENGAN API KEY ANDA
-  authDomain: "YOUR_AUTH_DOMAIN", // GANTI DENGAN AUTH DOMAIN ANDA
-  projectId: "YOUR_PROJECT_ID", // GANTI DENGAN PROJECT ID ANDA
-  storageBucket: "YOUR_STORAGE_BUCKET", // GANTI DENGAN STORAGE BUCKET ANDA
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // GANTI DENGAN MESSAGING SENDER ID ANDA
-  appId: "YOUR_APP_ID" // GANTI DENGAN APP ID ANDA
+  apiKey: "AIzaSyBhyfSnC_GCEEcBXoqWxsqjbbJDPCQCGQY", // GANTI DENGAN API KEY ANDA
+  authDomain: "upj-event-hub.firebaseapp.com", // GANTI DENGAN AUTH DOMAIN ANDA
+  projectId: "upj-event-hub", // GANTI DENGAN PROJECT ID ANDA
+  storageBucket: "upj-event-hub.firebasestorage.app", // GANTI DENGAN STORAGE BUCKET ANDA
+  messagingSenderId: "329944442699", // GANTI DENGAN MESSAGING SENDER ID ANDA
+  appId: "1:329944442699:web:a328d9566c438e08b2eace" // GANTI DENGAN APP ID ANDA
 };
 
 // Pemeriksaan dasar untuk memastikan placeholder telah diganti (opsional, tapi membantu)

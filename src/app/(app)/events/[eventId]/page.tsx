@@ -6,10 +6,10 @@ import type { Event, Ticket } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { eventStore } from '@/lib/eventStore';
@@ -24,6 +24,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import dynamic from 'next/dynamic';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+const EventMap = dynamic(() => import('@/components/map/EventMap'), {
+  ssr: false,
+  loading: () => <div className="h-full flex justify-center items-center bg-muted rounded-lg"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
+});
+
 
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
@@ -39,6 +47,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
 
   const [event, setEvent] = useState<Event | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
+  const [creator, setCreator] = useState<{ displayName: string; photoURL?: string | null } | null>(null);
+  const [loadingCreator, setLoadingCreator] = useState(false);
   const [isGettingTicket, setIsGettingTicket] = useState(false);
   const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false);
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
@@ -53,6 +63,37 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     setEvent(foundEvent || null);
     setLoadingEvent(false);
   }, [eventId]);
+
+  useEffect(() => {
+    if (event?.creatorId) {
+      setLoadingCreator(true);
+      const fetchCreator = async () => {
+        try {
+          const userDocRef = doc(db, 'users', event.creatorId!);
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            const userData = docSnap.data();
+            setCreator({
+              displayName: userData.displayName || 'Unknown Creator',
+              photoURL: userData.photoURL || undefined,
+            });
+          } else {
+            setCreator({ displayName: 'Unknown Creator' });
+          }
+        } catch (err) {
+          console.error("Error fetching creator details:", err);
+          setCreator({ displayName: 'Error loading organizer' });
+        } finally {
+          setLoadingCreator(false);
+        }
+      };
+      fetchCreator();
+    } else if (event && !event.creatorId) {
+        setCreator({ displayName: 'Organizer N/A' });
+        setLoadingCreator(false);
+    }
+  }, [event]);
+
 
   const proceedToGetTicket = async () => {
     if (!user || !event) return;
@@ -105,10 +146,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        // User already has a ticket for this event
         setShowConfirmationDialog(true);
       } else {
-        // No existing ticket, proceed directly
         await proceedToGetTicket();
       }
     } catch (error) {
@@ -146,6 +185,15 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     if (isGettingTicket) return "Getting Ticket...";
     return event.price && event.price > 0 ? `Get Ticket - $${event.price.toFixed(2)}` : 'Get Free Ticket';
   };
+  
+  const mapEvent = {
+    id: event.id,
+    title: event.title,
+    location: event.location,
+    category: event.category,
+    latitude: -6.2935, // Example: General UPJ/Bintaro Latitude
+    longitude: 106.7000, // Example: General UPJ/Bintaro Longitude
+  };
 
   return (
     <div className="bg-background min-h-screen">
@@ -153,7 +201,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         <Image 
             src={event.imageUrl} 
             alt={event.title} 
-            fill // Changed from layout="fill" to fill for Next 13+
+            fill
             objectFit="cover" 
             className="opacity-80"
             data-ai-hint={event.imageHint || "event hero"}
@@ -211,6 +259,26 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                 </div>
               </div>
             )}
+
+            {/* Creator Info */}
+            {loadingCreator ? (
+              <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Loading organizer...</span>
+              </div>
+            ) : creator && (
+              <div className="flex items-center space-x-3 pt-3 mt-3 border-t">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={creator.photoURL || undefined} alt={creator.displayName} data-ai-hint="organizer avatar"/>
+                  <AvatarFallback>{creator.displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-xs text-muted-foreground">Organized by</p>
+                  <p className="font-medium text-foreground">{creator.displayName}</p>
+                </div>
+              </div>
+            )}
+
             <Button 
               size="lg" 
               className="w-full mt-4" 
@@ -224,11 +292,14 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
           </div>
         </div>
         
-        <div className="border-t pt-6">
+        <div className="border-t pt-6 md:pt-8">
           <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-3">Location on Map</h2>
-          <div className="bg-muted h-64 rounded-lg flex items-center justify-center text-muted-foreground shadow-inner">
-            <MapPin className="h-8 w-8 mr-2"/>
-            Map placeholder - Integration coming soon!
+          <div className="bg-muted h-64 sm:h-80 md:h-96 rounded-lg shadow-inner overflow-hidden">
+            <EventMap
+              events={[mapEvent]}
+              initialPosition={[mapEvent.latitude, mapEvent.longitude]}
+              initialZoom={15}
+            />
           </div>
         </div>
       </div>
@@ -262,3 +333,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
+
