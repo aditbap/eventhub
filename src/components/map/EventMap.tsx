@@ -21,7 +21,7 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
     case 'Music': color = '#F97068'; break;
     case 'Food': color = '#4CAF50'; break;
     case 'Sports': color = '#FFA000'; break;
-    case 'Tech': color = '#3B82F6'; break;
+    case 'Tech': color = '#3B82F6'; break; // Using a blue for Tech as an example
   }
 
   const svgIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" class="event-marker-svg">
@@ -31,13 +31,14 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
 
   return L.divIcon({
     html: svgIconHtml,
-    className: 'custom-leaflet-div-icon',
+    className: 'custom-leaflet-div-icon', // Ensure this class is defined in your CSS to remove default divIcon styling
     iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+    iconAnchor: [16, 32], // Point of the icon that corresponds to marker's location
+    popupAnchor: [0, -32], // Point from which the popup should open relative to the iconAnchor
   });
 };
 
+// Fix for default Leaflet icon path issues with bundlers
 if (typeof window !== 'undefined') {
   // @ts-ignore
   delete L.Icon.Default.prototype._getIconUrl;
@@ -61,25 +62,30 @@ interface EventMapProps {
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
-
+  
   const primaryEventIdForKey = events[0]?.id;
+
+  // STABLE KEY GENERATION: Generate key once per component instance lifetime
   const [mapContainerReactKey] = useState(() =>
     `${primaryEventIdForKey || 'map'}-${Math.random().toString(36).slice(2)}`
   );
 
+  // console.log("Rendering EventMapComponent with key:", mapContainerReactKey);
+
   useEffect(() => {
     setIsClient(true);
-    // console.log("EventMapComponent: Rendering EventMapComponent with key:", mapContainerReactKey);
+    // console.log("EventMapComponent: MOUNT/EFFECT for key:", mapContainerReactKey);
 
     return () => {
-      // console.log("EventMapComponent: Cleaning up map for key:", mapContainerReactKey);
+      // console.log("EventMapComponent: CLEANUP for key:", mapContainerReactKey);
       if (mapRef.current) {
+        // console.log("EventMapComponent: Cleaning up map instance", mapRef.current);
         mapRef.current.off();
         mapRef.current.remove();
         mapRef.current = null;
       }
 
-      // Safely remove all Leaflet internal IDs from containers
+      // Safely remove all Leaflet internal IDs from containers with the specific class
       const containers = document.getElementsByClassName('leaflet-container');
       for (let i = 0; i < containers.length; i++) {
         const el: any = containers[i];
@@ -89,55 +95,56 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
         }
       }
     };
-  }, []); // Empty dependency array ensures this runs once on mount and unmount of EventMapComponent
+  }, []); // Empty dependency array: runs once on mount, cleans up on unmount
 
   if (!isClient) {
     return (
-      <div style={{ height: '100%', width: '100%' }} className="flex justify-center items-center bg-muted rounded-lg">
+      <div className="flex justify-center items-center bg-muted rounded-lg" style={{ height: '100%', width: '100%' }}>
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
+  
   return (
-    <MapContainer
-      key={mapContainerReactKey} // Use the stable key
-      // id prop is removed
-      center={initialPosition}
-      zoom={initialZoom}
-      scrollWheelZoom={true}
-      style={{ height: '100%', width: '100%' }}
-      className="rounded-lg shadow-md z-0" // leaflet-container class is added by Leaflet itself
-      whenCreated={(mapInstance) => {
-        mapRef.current = mapInstance;
-      }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {events.map((event) => (
-        <Marker
-          key={event.id} 
-          position={[event.latitude, event.longitude]}
-          icon={getCategoryIcon(event.category)}
-        >
-          <Popup minWidth={220}>
-            <div className="space-y-1.5 p-1">
-              <h3 className="font-headline font-semibold text-md">{event.title}</h3>
-              {event.location && <p className="text-xs text-muted-foreground">{event.location}</p>}
-              <Link href={`/events/${event.id}`} passHref>
-                <Button size="sm" className="w-full mt-2">
-                  View Details
-                </Button>
-              </Link>
-            </div>
-          </Popup>
-          <Tooltip>{event.title}</Tooltip>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
+    <div style={{ height: '100%', width: '100%' }}> {/* Wrapper div */}
+      <MapContainer
+        key={mapContainerReactKey} // Use the stable, instance-specific key
+        // No 'id' prop here, let react-leaflet manage it
+        center={initialPosition}
+        zoom={initialZoom}
+        scrollWheelZoom={true}
+        style={{ height: '100%', width: '100%' }}
+        className="rounded-lg shadow-md z-0" // Ensure z-index is appropriate if needed
+        whenCreated={(mapInstance) => {
+          mapRef.current = mapInstance;
+          // console.log("EventMapComponent: Map created for key:", mapContainerReactKey, mapInstance);
+        }}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {events.map((event) => (
+          <Marker
+            key={event.id} // Use event.id for marker keys
+            position={[event.latitude, event.longitude]}
+            icon={getCategoryIcon(event.category)}
+          >
+            <Popup minWidth={220}>
+              <div className="space-y-1.5 p-1">
+                <h3 className="font-headline font-semibold text-md">{event.title}</h3>
+                {event.location && <p className="text-xs text-muted-foreground">{event.location}</p>}
+                <Link href={`/events/${event.id}`} passHref>
+                  <Button size="sm" className="w-full mt-2">View Details</Button>
+                </Link>
+              </div>
+            </Popup>
+            <Tooltip>{event.title}</Tooltip>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
+  );  
 }
 
 const EventMap = memo(EventMapComponent);
