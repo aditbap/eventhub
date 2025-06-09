@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
 import './globals.css';
-import 'react-day-picker/dist/style.css'; // Import react-day-picker CSS
+// import 'react-day-picker/dist/style.css'; // Removed from here
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 
