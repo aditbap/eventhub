@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap, type Icon as LeafletIconType } from 'leaflet';
@@ -58,35 +58,41 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Counter to help generate unique keys for map instances if multiple EventMapComponents are on the same page
-// or if a parent component forces a remount.
-let mapInstanceIdCounter = 0;
+// Counter for unique DOM IDs
+let mapDomIdCounter = 0;
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  // Generate a unique key for this instance of EventMapComponent.
-  // This key will be used for the MapContainer to ensure React properly unmounts/remounts it.
-  const [mapContainerKey] = useState(() => `map-container-instance-${mapInstanceIdCounter++}`);
+  // Stable DOM ID for the map container DIV, unique per EventMapComponent instance
+  const [mapDomElementId] = useState(() => `leaflet-map-${mapDomIdCounter++}`);
+
+  // User's suggested key for MapContainer for frequent re-initialization
+  const primaryEventIdForKey = events[0]?.id;
+  const mapContainerReactKey = useMemo(() => {
+    return `${primaryEventIdForKey || 'map'}-${Date.now()}`;
+  }, [primaryEventIdForKey]);
+
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // Ensure map logic runs only on the client
 
-    // Cleanup function: This is critical for preventing the "map container already initialized" error.
-    // It runs when the EventMapComponent unmounts.
+    // This cleanup runs when EventMapComponent unmounts.
     return () => {
-      const map = mapRef.current;
-      if (map) {
-        // console.log(`Cleaning up map with key: ${mapContainerKey}`);
-        map.off(); // Remove all event listeners from the map instance
-        map.remove(); // Destroy the map instance and clear its related DOM elements
-        mapRef.current = null; // Clear our reference to the map instance
+      if (mapRef.current) {
+        mapRef.current.off();
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+
+      // User's suggested direct DOM manipulation for cleanup
+      const mapContainerElement = document.getElementById(mapDomElementId);
+      if (mapContainerElement && (mapContainerElement as any)._leaflet_id) {
+        (mapContainerElement as any)._leaflet_id = null;
       }
     };
-  }, [mapContainerKey]); // The dependency array includes mapContainerKey. Since mapContainerKey is stable for
-                         // the lifetime of this component instance (it's set once in useState),
-                         // this effect cleanup runs primarily on component unmount.
+  }, [mapDomElementId]); // mapDomElementId is stable for the component instance, so cleanup tied to instance lifecycle.
 
   if (!isClient) {
     return (
@@ -98,15 +104,14 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
-      key={mapContainerKey} // Use the unique key. If EventMapComponent is remounted, this key will be new for the new instance.
-      // No 'id' prop here. Let react-leaflet manage the actual DOM element's ID for the map.
+      key={mapContainerReactKey} // User's suggested key
+      id={mapDomElementId} // Stable DOM ID for targeting in cleanup
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
-        // console.log(`Map created with key: ${mapContainerKey}`);
         mapRef.current = mapInstance;
       }}
     >
