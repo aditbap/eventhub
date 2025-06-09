@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, memo, useId } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap, type Icon as LeafletIconType } from 'leaflet';
@@ -58,33 +58,29 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Global counter to make mapContainerKey more robust against HMR if component instance is somehow preserved
 let mapInstanceIdCounter = 0;
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
-
-  // Create a stable, unique key for THIS instance of EventMapComponent.
-  // This key will be used for the MapContainer.
-  // useState initializer ensures this runs only once per component instance.
-  const [mapContainerKey] = useState(() => `map-instance-${mapInstanceIdCounter++}`);
+  
+  // Stable unique ID for this component instance, used for both React key and map container DOM ID
+  const [mapDomId] = useState(() => `leaflet-map-container-${mapInstanceIdCounter++}`);
 
   useEffect(() => {
-    // This effect runs once after the component mounts on the client.
     setIsClient(true);
-
-    // Cleanup function: This runs when the EventMapComponent unmounts.
+    // console.log(`EventMapComponent mounted, mapId: ${mapDomId}`);
     return () => {
+      // console.log(`EventMapComponent unmounting, cleaning up map: ${mapDomId}`);
       if (mapRef.current) {
-        mapRef.current.remove(); // Crucial: Destroy the Leaflet map instance.
+        // console.log(`Executing map.remove() for map: ${mapDomId}`);
+        mapRef.current.remove(); // Tell Leaflet to clean up its listeners and DOM manipulations
         mapRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this effect and its cleanup run only on mount/unmount.
+  }, [mapDomId]); // mapDomId is stable for the component instance, so this effect runs once on mount and cleans on unmount.
 
   if (!isClient) {
-    // Render a placeholder or loader when not on the client or before client-side mount.
     return (
       <div style={{ height: '100%', width: '100%' }} className="flex justify-center items-center bg-muted rounded-lg">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -94,14 +90,16 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
-      key={mapContainerKey} // Use the stable unique key for this map instance
+      key={mapDomId} // Crucial React key: ensures new instance if parent forces re-creation
+      id={mapDomId}   // Explicit DOM ID for the map container div
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
-      className="rounded-lg shadow-md z-0" // z-0 can help with stacking context issues
+      className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
-        mapRef.current = mapInstance; // Store the map instance for cleanup
+        // console.log(`Leaflet map instance created for ${mapDomId}`, mapInstance);
+        mapRef.current = mapInstance;
       }}
     >
       <TileLayer
@@ -110,7 +108,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id} // Key for marker
+          key={event.id} // Key for marker, distinct from mapDomId
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
@@ -132,6 +130,8 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   );
 }
 
+// Using memo might still be beneficial if props don't change frequently.
+// If issues persist, you could try removing memo temporarily for debugging.
 const EventMap = memo(EventMapComponent);
 EventMap.displayName = 'EventMap';
 
