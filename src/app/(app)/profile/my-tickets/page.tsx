@@ -210,12 +210,13 @@ export default function MyTicketsPage() {
       </header>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'upcoming' | 'past')} className="flex-grow flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 rounded-none h-12 sticky top-16 z-20 bg-background border-b px-4">
+        <TabsList className="grid w-full grid-cols-2 rounded-none sticky top-16 z-20 bg-background border-b">
           <TabsTrigger 
             value="upcoming" 
             className={cn(
-              "text-base data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none rounded-none",
-              activeTab === 'upcoming' ? "text-primary font-semibold" : "text-muted-foreground"
+              "py-3 text-base rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-semibold",
+              "data-[state=inactive]:text-muted-foreground"
             )}
           >
             UPCOMING
@@ -223,8 +224,9 @@ export default function MyTicketsPage() {
           <TabsTrigger 
             value="past"
             className={cn(
-              "text-base data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none rounded-none",
-              activeTab === 'past' ? "text-primary font-semibold" : "text-muted-foreground"
+              "py-3 text-base rounded-none data-[state=active]:shadow-none",
+              "data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:font-semibold",
+              "data-[state=inactive]:text-muted-foreground"
             )}
           >
             PAST EVENTS
@@ -276,5 +278,6 @@ export default function MyTicketsPage() {
     </div>
   );
 }
+    
 
     
