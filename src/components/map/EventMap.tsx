@@ -64,29 +64,32 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   const primaryEventIdForKey = events[0]?.id;
   const [mapContainerReactKey] = useState(() =>
-    `${primaryEventIdForKey || 'map'}-${Math.random().toString(36).substring(2)}`
+    `${primaryEventIdForKey || 'map'}-${Math.random().toString(36).slice(2)}`
   );
 
   useEffect(() => {
     setIsClient(true);
+    // console.log("EventMapComponent: Rendering EventMapComponent with key:", mapContainerReactKey);
 
     return () => {
+      // console.log("EventMapComponent: Cleaning up map for key:", mapContainerReactKey);
       if (mapRef.current) {
         mapRef.current.off();
         mapRef.current.remove();
         mapRef.current = null;
       }
 
-      // Destroy _leaflet_id from all containers
-      const mapContainers = document.getElementsByClassName('leaflet-container');
-      for (let i = 0; i < mapContainers.length; i++) {
-        const container: any = mapContainers[i];
-        if (container._leaflet_id) {
-          container._leaflet_id = null;
+      // Safely remove all Leaflet internal IDs from containers
+      const containers = document.getElementsByClassName('leaflet-container');
+      for (let i = 0; i < containers.length; i++) {
+        const el: any = containers[i];
+        if (el._leaflet_id) {
+          // console.log("EventMapComponent: Nullifying _leaflet_id for container:", el);
+          el._leaflet_id = null;
         }
       }
     };
-  }, []); // Empty dependency array, runs on mount and unmount
+  }, []); // Empty dependency array ensures this runs once on mount and unmount of EventMapComponent
 
   if (!isClient) {
     return (
@@ -98,13 +101,13 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
-      key={mapContainerReactKey}
-      // id prop removed
+      key={mapContainerReactKey} // Use the stable key
+      // id prop is removed
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
-      className="rounded-lg shadow-md z-0"
+      className="rounded-lg shadow-md z-0" // leaflet-container class is added by Leaflet itself
       whenCreated={(mapInstance) => {
         mapRef.current = mapInstance;
       }}
