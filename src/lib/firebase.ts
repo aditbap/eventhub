@@ -5,36 +5,44 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 // ==========================================================================================
-// Firebase Configuration - Updated to use Environment Variables
+// Firebase Configuration for Firebase Studio Development
+// ==========================================================================================
+// PENTING: Ganti nilai placeholder di bawah ini dengan kredensial aktual dari proyek Firebase Anda.
+// Anda bisa menemukan nilai-nilai ini di Firebase Console > Project settings > General > Your apps > Web app.
 // ==========================================================================================
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: "YOUR_API_KEY", // GANTI DENGAN API KEY ANDA
+  authDomain: "YOUR_AUTH_DOMAIN", // GANTI DENGAN AUTH DOMAIN ANDA
+  projectId: "YOUR_PROJECT_ID", // GANTI DENGAN PROJECT ID ANDA
+  storageBucket: "YOUR_STORAGE_BUCKET", // GANTI DENGAN STORAGE BUCKET ANDA
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // GANTI DENGAN MESSAGING SENDER ID ANDA
+  appId: "YOUR_APP_ID" // GANTI DENGAN APP ID ANDA
 };
+
+// Pemeriksaan dasar untuk memastikan placeholder telah diganti
+if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+  console.warn(
+    "PERINGATAN: Konfigurasi Firebase masih menggunakan nilai placeholder. " +
+    "Harap perbarui src/lib/firebase.ts dengan kredensial proyek Firebase Anda yang sebenarnya agar aplikasi berfungsi dengan benar."
+  );
+}
 
 // Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
-  // Basic check to ensure that critical config values are present
-  // Firebase SDK will throw more specific errors if they are invalid.
-  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    console.error(
-      "Firebase configuration is missing critical values (apiKey or projectId). " +
-      "Please ensure NEXT_PUBLIC_FIREBASE_API_KEY and NEXT_PUBLIC_FIREBASE_PROJECT_ID are set in your environment."
-    );
-    // Avoid throwing an error here directly to let the Firebase SDK attempt initialization
-    // and provide its own potentially more detailed error message.
-  }
   try {
     app = initializeApp(firebaseConfig);
   } catch (error) {
     console.error("Error initializing Firebase app:", error);
-    // Re-throw the error if critical, or handle as appropriate
-    throw new Error(`Failed to initialize Firebase: ${(error as Error).message}. Ensure all NEXT_PUBLIC_FIREBASE_ environment variables are correctly set.`);
+    // Jika konfigurasi belum diganti, errornya mungkin karena itu.
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+        throw new Error(
+            `Gagal menginisialisasi Firebase: ${(error as Error).message}. ` +
+            "Sepertinya Anda masih menggunakan placeholder 'YOUR_API_KEY' di src/lib/firebase.ts. " +
+            "Harap ganti dengan nilai API Key proyek Firebase Anda."
+        );
+    }
+    throw new Error(`Failed to initialize Firebase: ${(error as Error).message}.`);
   }
 } else {
   app = getApps()[0];
