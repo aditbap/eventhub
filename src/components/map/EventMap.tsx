@@ -64,20 +64,22 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
   
-  const [mapDomId] = useState(() => `leaflet-map-container-${mapInstanceIdCounter++}`);
+  // (B) Use a unique ID for the DOM element, stable for this component instance.
+  const [mapDomId] = useState(() => `leaflet-map-instance-${mapInstanceIdCounter++}`);
 
   useEffect(() => {
-    setIsClient(true);
-    const currentMapRef = mapRef.current; // Capture the ref value for cleanup
+    setIsClient(true); // Enable client-side rendering
 
+    // (E) On component "dismount" destroy things
     return () => {
-      if (currentMapRef) {
-        currentMapRef.off(); // Remove all event listeners
-        currentMapRef.remove(); // Then remove the map
+      if (mapRef.current) {
+        // console.log(`Cleaning up map: ${mapDomId}`);
+        mapRef.current.off(); // Remove all event listeners from the map instance
+        mapRef.current.remove(); // Destroy the map instance and clear its related DOM elements
+        mapRef.current = null; // Clear our reference
       }
-      // mapRef.current = null; // No longer explicitly setting mapRef.current to null here as it's managed by component lifecycle
     };
-  }, []); // Empty dependency array ensures this runs once on mount and cleans on unmount.
+  }, [mapDomId]); // mapDomId is stable per instance, so this effect runs on mount/unmount
 
   if (!isClient) {
     return (
@@ -89,6 +91,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
+      // (B) Use the unique mapDomId as the React key AND the DOM id
       key={mapDomId} 
       id={mapDomId}   
       center={initialPosition}
@@ -97,6 +100,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
+        // console.log(`Map created: ${mapDomId}`, mapInstance);
         mapRef.current = mapInstance;
       }}
     >
