@@ -19,12 +19,14 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID" // GANTI DENGAN APP ID ANDA
 };
 
-// Pemeriksaan dasar untuk memastikan placeholder telah diganti
+// Pemeriksaan dasar untuk memastikan placeholder telah diganti (opsional, tapi membantu)
 if (firebaseConfig.apiKey === "YOUR_API_KEY" || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
   console.warn(
-    "PERINGATAN: Konfigurasi Firebase masih menggunakan nilai placeholder. " +
-    "Harap perbarui src/lib/firebase.ts dengan kredensial proyek Firebase Anda yang sebenarnya agar aplikasi berfungsi dengan benar."
+    "PERINGATAN: Konfigurasi Firebase di src/lib/firebase.ts masih menggunakan nilai placeholder. " +
+    "Harap perbarui dengan kredensial proyek Firebase Anda yang sebenarnya agar aplikasi berfungsi dengan benar."
   );
+  // Anda bisa memilih untuk melempar error di sini jika ingin lebih tegas
+  // throw new Error("Konfigurasi Firebase placeholder belum diganti. Harap perbarui src/lib/firebase.ts");
 }
 
 // Initialize Firebase
@@ -34,7 +36,7 @@ if (!getApps().length) {
     app = initializeApp(firebaseConfig);
   } catch (error) {
     console.error("Error initializing Firebase app:", error);
-    // Jika konfigurasi belum diganti, errornya mungkin karena itu.
+     // Jika konfigurasi belum diganti, errornya mungkin karena itu.
     if (firebaseConfig.apiKey === "YOUR_API_KEY") {
         throw new Error(
             `Gagal menginisialisasi Firebase: ${(error as Error).message}. ` +
