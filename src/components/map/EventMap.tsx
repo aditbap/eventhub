@@ -1,15 +1,15 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo, useId } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap, type Icon as LeafletIconType } from 'leaflet';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import type { Event } from '@/types'; // Assuming Event type is in @/types
+import type { Event } from '@/types';
+import { Loader2 } from 'lucide-react';
 
-// Define MapPageEvent type here as it's specific to the map functionality
 export interface MapPageEvent extends Pick<Event, 'id' | 'title' | 'category' | 'location'> {
   latitude: number;
   longitude: number;
@@ -18,10 +18,10 @@ export interface MapPageEvent extends Pick<Event, 'id' | 'title' | 'category' | 
 const getCategoryIcon = (category?: string): LeafletIconType => {
   let color = '#757575'; // Default grey
   switch (category) {
-    case 'Music': color = '#F97068'; break; 
-    case 'Food': color = '#4CAF50'; break;  
-    case 'Sports': color = '#FFA000'; break; 
-    case 'Tech': color = '#3B82F6'; break; 
+    case 'Music': color = '#F97068'; break;
+    case 'Food': color = '#4CAF50'; break;
+    case 'Sports': color = '#FFA000'; break;
+    case 'Tech': color = '#3B82F6'; break;
   }
 
   const svgIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" class="event-marker-svg">
@@ -31,14 +31,13 @@ const getCategoryIcon = (category?: string): LeafletIconType => {
 
   return L.divIcon({
     html: svgIconHtml,
-    className: 'custom-leaflet-div-icon', // Ensure this class is in globals.css
+    className: 'custom-leaflet-div-icon',
     iconSize: [32, 32],
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
   });
 };
 
-// Leaflet default icon path fix
 if (typeof window !== 'undefined') {
   // @ts-ignore
   delete L.Icon.Default.prototype._getIconUrl;
@@ -53,54 +52,56 @@ if (typeof window !== 'undefined') {
   });
 }
 
-
 interface EventMapProps {
   events: MapPageEvent[];
   initialPosition?: [number, number];
   initialZoom?: number;
 }
 
-// Global counter to help ensure unique keys across unmounts/remounts (e.g. Strict Mode)
-let mapInstanceCounter = 0;
+// Global counter to make mapContainerKey more robust against HMR if component instance is somehow preserved
+let mapInstanceIdCounter = 0;
 
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
-  // Key for MapContainer to force re-creation if component instance is re-used by React (e.g. Strict Mode)
-  const [mapContainerKey, setMapContainerKey] = useState(`map-container-${mapInstanceCounter++}-${Date.now()}`);
   const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true); // Set isClient to true only on the client side after mount
+  // Create a stable, unique key for THIS instance of EventMapComponent.
+  // This key will be used for the MapContainer.
+  // useState initializer ensures this runs only once per component instance.
+  const [mapContainerKey] = useState(() => `map-instance-${mapInstanceIdCounter++}`);
 
+  useEffect(() => {
+    // This effect runs once after the component mounts on the client.
+    setIsClient(true);
+
+    // Cleanup function: This runs when the EventMapComponent unmounts.
     return () => {
-      // Cleanup function:
-      // 1. Remove the Leaflet map instance if it exists
       if (mapRef.current) {
-        mapRef.current.remove();
+        mapRef.current.remove(); // Crucial: Destroy the Leaflet map instance.
         mapRef.current = null;
       }
-      // 2. Reset isClient state
-      setIsClient(false);
-      // 3. Update the key to ensure a fresh DOM element for MapContainer on next mount
-      setMapContainerKey(`map-container-${mapInstanceCounter++}-${Date.now()}`);
     };
-  }, []); // Empty dependency array: runs on mount and cleanup on unmount
+  }, []); // Empty dependency array ensures this effect and its cleanup run only on mount/unmount.
 
   if (!isClient) {
-    // Render nothing or a placeholder on the server / before client-side hydration
-    return null; 
+    // Render a placeholder or loader when not on the client or before client-side mount.
+    return (
+      <div style={{ height: '100%', width: '100%' }} className="flex justify-center items-center bg-muted rounded-lg">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
     <MapContainer
-      key={mapContainerKey} // Crucial for re-initialization with a fresh DOM node
+      key={mapContainerKey} // Use the stable unique key for this map instance
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
-      className="rounded-lg shadow-md z-0" // z-0 can help with some stacking context issues
+      className="rounded-lg shadow-md z-0" // z-0 can help with stacking context issues
       whenCreated={(mapInstance) => {
-        mapRef.current = mapInstance;
+        mapRef.current = mapInstance; // Store the map instance for cleanup
       }}
     >
       <TileLayer
@@ -109,7 +110,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id}
+          key={event.id} // Key for marker
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
