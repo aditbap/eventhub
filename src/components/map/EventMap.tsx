@@ -64,21 +64,20 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
   
-  // Stable unique ID for this component instance, used for both React key and map container DOM ID
   const [mapDomId] = useState(() => `leaflet-map-container-${mapInstanceIdCounter++}`);
 
   useEffect(() => {
     setIsClient(true);
-    // console.log(`EventMapComponent mounted, mapId: ${mapDomId}`);
+    const currentMapRef = mapRef.current; // Capture the ref value for cleanup
+
     return () => {
-      // console.log(`EventMapComponent unmounting, cleaning up map: ${mapDomId}`);
-      if (mapRef.current) {
-        // console.log(`Executing map.remove() for map: ${mapDomId}`);
-        mapRef.current.remove(); // Tell Leaflet to clean up its listeners and DOM manipulations
-        mapRef.current = null;
+      if (currentMapRef) {
+        currentMapRef.off(); // Remove all event listeners
+        currentMapRef.remove(); // Then remove the map
       }
+      // mapRef.current = null; // No longer explicitly setting mapRef.current to null here as it's managed by component lifecycle
     };
-  }, [mapDomId]); // mapDomId is stable for the component instance, so this effect runs once on mount and cleans on unmount.
+  }, []); // Empty dependency array ensures this runs once on mount and cleans on unmount.
 
   if (!isClient) {
     return (
@@ -90,15 +89,14 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
-      key={mapDomId} // Crucial React key: ensures new instance if parent forces re-creation
-      id={mapDomId}   // Explicit DOM ID for the map container div
+      key={mapDomId} 
+      id={mapDomId}   
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
       style={{ height: '100%', width: '100%' }}
       className="rounded-lg shadow-md z-0"
       whenCreated={(mapInstance) => {
-        // console.log(`Leaflet map instance created for ${mapDomId}`, mapInstance);
         mapRef.current = mapInstance;
       }}
     >
@@ -108,7 +106,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id} // Key for marker, distinct from mapDomId
+          key={event.id} 
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
@@ -130,8 +128,6 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
   );
 }
 
-// Using memo might still be beneficial if props don't change frequently.
-// If issues persist, you could try removing memo temporarily for debugging.
 const EventMap = memo(EventMapComponent);
 EventMap.displayName = 'EventMap';
 
