@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useRef, useState, memo, useMemo } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type Map as LeafletMap, type Icon as LeafletIconType } from 'leaflet';
@@ -58,27 +58,18 @@ interface EventMapProps {
   initialZoom?: number;
 }
 
-// Counter for unique DOM IDs
-let mapDomIdCounter = 0;
-
 function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], initialZoom = 13 }: EventMapProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const [isClient, setIsClient] = useState(false);
 
-  // Stable DOM ID for the map container DIV, unique per EventMapComponent instance
-  const [mapDomElementId] = useState(() => `leaflet-map-${mapDomIdCounter++}`);
-
-  // User's suggested key for MapContainer for frequent re-initialization
   const primaryEventIdForKey = events[0]?.id;
-  const mapContainerReactKey = useMemo(() => {
-    return `${primaryEventIdForKey || 'map'}-${Date.now()}`;
-  }, [primaryEventIdForKey]);
-
+  const [mapContainerReactKey] = useState(() =>
+    `${primaryEventIdForKey || 'map'}-${Math.random().toString(36).substring(2)}`
+  );
 
   useEffect(() => {
-    setIsClient(true); // Ensure map logic runs only on the client
+    setIsClient(true);
 
-    // This cleanup runs when EventMapComponent unmounts.
     return () => {
       if (mapRef.current) {
         mapRef.current.off();
@@ -86,13 +77,16 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
         mapRef.current = null;
       }
 
-      // User's suggested direct DOM manipulation for cleanup
-      const mapContainerElement = document.getElementById(mapDomElementId);
-      if (mapContainerElement && (mapContainerElement as any)._leaflet_id) {
-        (mapContainerElement as any)._leaflet_id = null;
+      // Destroy _leaflet_id from all containers
+      const mapContainers = document.getElementsByClassName('leaflet-container');
+      for (let i = 0; i < mapContainers.length; i++) {
+        const container: any = mapContainers[i];
+        if (container._leaflet_id) {
+          container._leaflet_id = null;
+        }
       }
     };
-  }, [mapDomElementId]); // mapDomElementId is stable for the component instance, so cleanup tied to instance lifecycle.
+  }, []); // Empty dependency array, runs on mount and unmount
 
   if (!isClient) {
     return (
@@ -104,8 +98,8 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
 
   return (
     <MapContainer
-      key={mapContainerReactKey} // User's suggested key
-      id={mapDomElementId} // Stable DOM ID for targeting in cleanup
+      key={mapContainerReactKey}
+      // id prop removed
       center={initialPosition}
       zoom={initialZoom}
       scrollWheelZoom={true}
@@ -121,7 +115,7 @@ function EventMapComponent({ events, initialPosition = [-6.2971, 106.7000], init
       />
       {events.map((event) => (
         <Marker
-          key={event.id} // React key for list item
+          key={event.id} 
           position={[event.latitude, event.longitude]}
           icon={getCategoryIcon(event.category)}
         >
