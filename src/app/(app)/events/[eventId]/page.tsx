@@ -6,7 +6,7 @@ import type { Event, Ticket } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -24,14 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import dynamic from 'next/dynamic';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-const EventMap = dynamic(() => import('@/components/map/EventMap'), {
-  ssr: false,
-  loading: () => <div className="h-full flex justify-center items-center bg-muted rounded-lg"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>,
-});
-
 
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
@@ -186,15 +179,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     return event.price && event.price > 0 ? `Get Ticket - $${event.price.toFixed(2)}` : 'Get Free Ticket';
   };
   
-  const mapEvent = {
-    id: event.id,
-    title: event.title,
-    location: event.location,
-    category: event.category,
-    latitude: -6.2935, // Example: General UPJ/Bintaro Latitude
-    longitude: 106.7000, // Example: General UPJ/Bintaro Longitude
-  };
-
   return (
     <div className="bg-background min-h-screen">
       <div className="relative h-[300px] sm:h-[400px] md:h-[500px] w-full">
@@ -294,12 +278,10 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         
         <div className="border-t pt-6 md:pt-8">
           <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-3">Location on Map</h2>
-          <div className="bg-muted h-64 sm:h-80 md:h-96 rounded-lg shadow-inner overflow-hidden">
-            <EventMap
-              events={[mapEvent]}
-              initialPosition={[mapEvent.latitude, mapEvent.longitude]}
-              initialZoom={15}
-            />
+          <div className="bg-muted h-64 sm:h-80 md:h-96 rounded-lg shadow-inner overflow-hidden flex flex-col items-center justify-center text-center p-4">
+            <Wrench className="h-16 w-16 text-primary/40 mb-4" strokeWidth={1.5} />
+            <h3 className="text-lg font-semibold text-muted-foreground">Map Feature Coming Soon</h3>
+            <p className="text-sm text-muted-foreground">Interactive map will be available in a future update.</p>
           </div>
         </div>
       </div>
@@ -333,4 +315,3 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
-

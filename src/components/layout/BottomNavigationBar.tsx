@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, MapPin, type Icon } from 'lucide-react'; // Added MapPin back
+import { Compass, CalendarDays, Plus, UserCircle, type Icon, Wrench } from 'lucide-react'; 
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -11,13 +11,14 @@ interface NavItem {
   label: string;
   icon: Icon;
   isCreateButton?: boolean;
+  isDisabled?: boolean; // Added for "Map"
 }
 
 const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
-  { href: '/map', label: 'Map', icon: MapPin }, // Added Map item back
+  { href: '/map', label: 'Map', icon: Wrench, isDisabled: true }, // Changed icon, marked disabled
   { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
@@ -35,7 +36,7 @@ export function BottomNavigationBar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex flex-col items-center justify-center -mt-5 z-10" // Negative margin to elevate
+                className="flex flex-col items-center justify-center -mt-5 z-10" 
                 aria-label={item.label}
               >
                 <div className={cn(
@@ -44,7 +45,6 @@ export function BottomNavigationBar() {
                 )}>
                   <item.icon className="h-7 w-7" />
                 </div>
-                {/* Label for create button is usually omitted when icon is large and distinct */}
               </Link>
             );
           }
@@ -54,15 +54,18 @@ export function BottomNavigationBar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5', // Adjusted width back to w-1/5 for 5 items
-                isActive && 'text-primary'
+                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5',
+                isActive && !item.isDisabled && 'text-primary',
+                item.isDisabled && 'opacity-50 cursor-not-allowed hover:text-muted-foreground' 
               )}
               aria-label={item.label}
+              onClick={(e) => {
+                if (item.isDisabled) e.preventDefault();
+              }}
             >
-              <item.icon className={cn('h-6 w-6 mb-0.5', isActive ? 'text-primary' : '')} 
-                // fill prop removed: Lucide icons will use currentColor for stroke, set by text-primary
+              <item.icon className={cn('h-6 w-6 mb-0.5', isActive && !item.isDisabled ? 'text-primary' : '')} 
               />
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className={cn("text-xs font-medium", item.isDisabled && "text-muted-foreground/80")}>{item.label}</span>
             </Link>
           );
         })}
