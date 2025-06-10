@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Ticket, Event } from '@/types'; 
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3 } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react'; // Added Users, UserPlus
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore'; // Added getDoc
 import { useRouter } from 'next/navigation';
@@ -49,16 +49,30 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
 };
 
 interface StatItemProps {
-  value: string | number;
+  value: React.ReactNode; // Changed from string | number to React.ReactNode
   label: string;
+  href?: string;
+  onClick?: () => void;
 }
 
-const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
-  <div className="flex flex-col items-center">
-    <p className="text-xl font-semibold text-foreground">{value}</p>
-    <p className="text-xs text-muted-foreground">{label}</p>
-  </div>
-);
+const StatItem: React.FC<StatItemProps> = ({ value, label, href, onClick }) => {
+  const itemContent = (
+    <div className="flex flex-col items-center">
+      <p className="text-xl font-semibold text-foreground h-6 flex items-center justify-center"> {/* Added h-6 for consistent height */}
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+
+  if (href) {
+    return <Link href={href} className="text-center hover:opacity-80 transition-opacity">{itemContent}</Link>;
+  }
+  if (onClick) {
+    return <button onClick={onClick} className="text-center hover:opacity-80 transition-opacity">{itemContent}</button>
+  }
+  return <div className="text-center">{itemContent}</div>;
+};
 
 
 export default function ProfilePage() {
@@ -72,6 +86,11 @@ export default function ProfilePage() {
   const [currentUserBio, setCurrentUserBio] = useState<string | null>(null); 
   const [loadingBio, setLoadingBio] = useState(true); 
   const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false); 
+
+  const [followingCount, setFollowingCount] = useState<number>(0);
+  const [followersCount, setFollowersCount] = useState<number>(0);
+  const [loadingFollowing, setLoadingFollowing] = useState(true);
+  const [loadingFollowers, setLoadingFollowers] = useState(true);
 
   const router = useRouter();
   const { toast } = useToast();
@@ -129,6 +148,16 @@ export default function ProfilePage() {
       };
       fetchUserBio();
 
+      // Simulate fetching following/followers count
+      setLoadingFollowing(true);
+      setLoadingFollowers(true);
+      setTimeout(() => {
+        setFollowingCount(0); // Placeholder
+        setFollowersCount(0); // Placeholder
+        setLoadingFollowing(false);
+        setLoadingFollowers(false);
+      }, 700); // Simulate network delay
+
       return () => {
         unsubscribeEventStore(); 
       };
@@ -138,6 +167,8 @@ export default function ProfilePage() {
       setLoadingMyEvents(false);
       setLoadingSavedEvents(false);
       setLoadingBio(false);
+      setLoadingFollowing(false);
+      setLoadingFollowers(false);
     }
   }, [user, authLoading]);
 
@@ -225,11 +256,21 @@ export default function ProfilePage() {
           </Button>
 
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
-            <StatItem value="0" label="Post" />
+            <StatItem 
+              value={loadingMyEvents ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount} 
+              label="My Events" 
+              href="/profile/my-events"
+            />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem value="234" label="Following" /> 
+            <StatItem 
+              value={loadingFollowing ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount} 
+              label="Following" 
+            /> 
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem value="105" label="Follower" />
+            <StatItem 
+              value={loadingFollowers ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount} 
+              label="Followers" 
+            />
           </div>
         </div>
       </div>
@@ -266,5 +307,4 @@ export default function ProfilePage() {
     </div>
   );
 }
-
     
