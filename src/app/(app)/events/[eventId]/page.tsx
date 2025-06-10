@@ -87,6 +87,10 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     }
   }, [event]);
 
+  // Determine if creator info is valid for follow/profile actions
+  const isRealCreator = creator && event?.creatorId &&
+                       !['Unknown Creator', 'Error loading organizer', 'Organizer N/A'].includes(creator.displayName);
+
 
   const proceedToGetTicket = async () => {
     if (!user || !event) return;
@@ -156,7 +160,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleViewOrganizerProfile = () => {
-    if (event?.creatorId) {
+    if (event?.creatorId) { // Gated by creatorId existing on event
         toast({
             title: "Feature Coming Soon!",
             description: "Viewing organizer profiles will be available in a future update.",
@@ -166,13 +170,18 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleFollowOrganizer = () => {
-    if (event?.creatorId && creator) {
+    if (isRealCreator && creator) {
         toast({
             title: "Feature Coming Soon!",
             description: `The ability to follow ${creator.displayName} will be available soon.`,
         });
-        // Future: Implement actual follow logic here
+    } else if (event?.creatorId) { // If there's a creatorId but not "real" info (e.g. error or unknown)
+         toast({
+            title: "Feature Coming Soon!",
+            description: "Following organizers will be available in a future update.",
+        });
     }
+    // If no event.creatorId, follow button wouldn't render anyway.
   };
 
 
@@ -277,15 +286,15 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                     onClick={handleViewOrganizerProfile}
                     className="flex items-center space-x-3 group hover:opacity-80 transition-opacity"
                     disabled={!event?.creatorId}
-                    aria-label={`View profile of ${creator.displayName}`}
+                    aria-label={isRealCreator && creator?.displayName ? `View profile of ${creator.displayName}` : 'View organizer profile'}
                   >
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src={creator.photoURL || undefined} alt={creator.displayName} data-ai-hint="organizer avatar"/>
-                      <AvatarFallback>{creator.displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={creator.photoURL || undefined} alt={creator.displayName || 'Organizer'} data-ai-hint="organizer avatar"/>
+                      <AvatarFallback>{(creator?.displayName && creator.displayName.trim() !== '') ? creator.displayName.charAt(0).toUpperCase() : 'O'}</AvatarFallback>
                     </Avatar>
                     <div>
                       <p className="text-xs text-muted-foreground">Organized by</p>
-                      <p className="font-medium text-foreground group-hover:underline">{creator.displayName}</p>
+                      <p className="font-medium text-foreground group-hover:underline">{creator.displayName || 'Organizer'}</p>
                     </div>
                   </button>
                   {user && event?.creatorId && user.uid !== event.creatorId && (
@@ -294,7 +303,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                       size="sm"
                       onClick={handleFollowOrganizer}
                       className="ml-auto"
-                      aria-label={`Follow ${creator.displayName}`}
+                      disabled={!isRealCreator}
+                      aria-label={isRealCreator && creator?.displayName ? `Follow ${creator.displayName}` : 'Follow organizer'}
                     >
                       <UserPlus className="mr-2 h-4 w-4" />
                       Follow
@@ -357,3 +367,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   );
 }
 
+    
