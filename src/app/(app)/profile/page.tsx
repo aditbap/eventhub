@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Ticket, Event } from '@/types'; 
+import type { Ticket, Event } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react'; // Added Users, UserPlus
@@ -14,8 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
-import { eventStore } from '@/lib/eventStore'; 
-import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog'; 
+import { eventStore } from '@/lib/eventStore';
+import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog';
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -45,7 +45,7 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
   if (onClick) {
     return <button onClick={onClick} className="w-full text-left">{content}</button>;
   }
-  return <div className="w-full">{content}</div>; 
+  return <div className="w-full">{content}</div>;
 };
 
 interface StatItemProps {
@@ -76,16 +76,16 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, href, onClick }) => {
 
 
 export default function ProfilePage() {
-  const { user, logout, loading: authLoading, updateUserBio } = useAuth(); 
-  const [ticketsCount, setTicketsCount] = useState<number>(0); 
-  const [myEventsCount, setMyEventsCount] = useState<number>(0); 
-  const [savedEventsCount, setSavedEventsCount] = useState<number>(0); 
-  const [loadingTickets, setLoadingTickets] = useState(true); 
-  const [loadingMyEvents, setLoadingMyEvents] = useState(true); 
-  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true); 
-  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null); 
-  const [loadingBio, setLoadingBio] = useState(true); 
-  const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false); 
+  const { user, logout, loading: authLoading, updateUserBio } = useAuth();
+  const [ticketsCount, setTicketsCount] = useState<number>(0);
+  const [myEventsCount, setMyEventsCount] = useState<number>(0);
+  const [savedEventsCount, setSavedEventsCount] = useState<number>(0);
+  const [loadingTickets, setLoadingTickets] = useState(true);
+  const [loadingMyEvents, setLoadingMyEvents] = useState(true);
+  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true);
+  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null);
+  const [loadingBio, setLoadingBio] = useState(true);
+  const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false);
 
   const [followingCount, setFollowingCount] = useState<number>(0);
   const [followersCount, setFollowersCount] = useState<number>(0);
@@ -126,7 +126,7 @@ export default function ProfilePage() {
         setLoadingSavedEvents(false);
       };
       const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
-      fetchEventCountsFromStore(); 
+      fetchEventCountsFromStore();
 
       // Fetch Bio
       const fetchUserBio = async () => {
@@ -159,10 +159,10 @@ export default function ProfilePage() {
       }, 700); // Simulate network delay
 
       return () => {
-        unsubscribeEventStore(); 
+        unsubscribeEventStore();
       };
 
-    } else if (!authLoading) { 
+    } else if (!authLoading) {
       setLoadingTickets(false);
       setLoadingMyEvents(false);
       setLoadingSavedEvents(false);
@@ -191,7 +191,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (authLoading || !user) { 
+  if (authLoading || !user) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
@@ -202,7 +202,7 @@ export default function ProfilePage() {
           <ArrowLeft className="h-6 w-6" />
         </Button>
         <h1 className="text-xl font-headline font-semibold text-foreground">Profile</h1>
-        <div className="w-9 h-9"></div> 
+        <div className="w-9 h-9"></div>
       </header>
 
       <div className="bg-gradient-to-b from-emerald-100/40 via-emerald-50/20 to-background/0 pt-2 pb-8 px-4">
@@ -212,10 +212,10 @@ export default function ProfilePage() {
               <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" className="rounded-2xl" />
               <AvatarFallback className="text-4xl rounded-2xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
-            <Button 
-              variant="default" 
-              size="icon" 
-              className="absolute bottom-0 right-0 bg-primary text-primary-foreground hover:bg-primary/90 h-8 w-8 rounded-full shadow-md border-2 border-background" 
+            <Button
+              variant="default"
+              size="icon"
+              className="absolute bottom-0 right-0 bg-primary text-primary-foreground hover:bg-primary/90 h-8 w-8 rounded-full shadow-md border-2 border-background"
               onClick={() => router.push('/settings')}
               aria-label="Edit profile"
             >
@@ -223,14 +223,14 @@ export default function ProfilePage() {
             </Button>
           </div>
           <h2 className="text-2xl font-headline font-semibold text-foreground mt-2">{user.displayName || 'User Name'}</h2>
-          
+
           {loadingBio ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
           ) : currentUserBio ? (
             <div className="mt-1 text-sm text-muted-foreground text-center max-w-md px-4">
               <p className="whitespace-pre-line break-words">{currentUserBio}</p>
-              <Button 
-                variant="link" 
+              <Button
+                variant="link"
                 className="text-xs text-primary hover:underline p-0 h-auto mt-0.5"
                 onClick={() => setIsChangeBioDialogOpen(true)}
               >
@@ -238,8 +238,8 @@ export default function ProfilePage() {
               </Button>
             </div>
           ) : (
-            <Button 
-              variant="link" 
+            <Button
+              variant="link"
               className="text-sm text-muted-foreground hover:text-primary p-0 h-auto mt-1"
               onClick={() => setIsChangeBioDialogOpen(true)}
             >
@@ -247,8 +247,8 @@ export default function ProfilePage() {
             </Button>
           )}
 
-          <Button 
-            variant="default" 
+          <Button
+            variant="default"
             className="rounded-full bg-primary/10 hover:bg-primary/20 text-primary px-6 py-2 text-sm font-semibold mt-3 shadow-sm"
             onClick={() => router.push('/settings')}
           >
@@ -256,20 +256,22 @@ export default function ProfilePage() {
           </Button>
 
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
-            <StatItem 
-              value={loadingMyEvents ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount} 
-              label="My Events" 
+            <StatItem
+              value={loadingMyEvents ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
+              label="My Events"
               href="/profile/my-events"
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem 
-              value={loadingFollowing ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount} 
-              label="Following" 
-            /> 
+            <StatItem
+              value={loadingFollowing ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
+              label="Following"
+              href="/profile/following"
+            />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
-            <StatItem 
-              value={loadingFollowers ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount} 
-              label="Followers" 
+            <StatItem
+              value={loadingFollowers ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
+              label="Followers"
+              href="/profile/followers"
             />
           </div>
         </div>
@@ -277,27 +279,27 @@ export default function ProfilePage() {
 
       <section className="px-4 pb-20 -mt-2">
         <div className="space-y-4 mb-6">
-          <ProfileMenuItem 
-            icon={TicketIconLucide} 
-            label="My Tickets" 
+          <ProfileMenuItem
+            icon={TicketIconLucide}
+            label="My Tickets"
             count={loadingTickets ? undefined : ticketsCount}
-            href="/profile/my-tickets" 
+            href="/profile/my-tickets"
           />
-          <ProfileMenuItem 
-            icon={CalendarDays} 
-            label="My Events" 
-            count={loadingMyEvents ? undefined : myEventsCount} 
+          <ProfileMenuItem
+            icon={CalendarDays}
+            label="My Events"
+            count={loadingMyEvents ? undefined : myEventsCount}
             href="/profile/my-events"
           />
-          <ProfileMenuItem 
-            icon={Bookmark} 
-            label="Saved Events" 
-            count={loadingSavedEvents ? undefined : savedEventsCount} 
-            href="/profile/saved-events" 
+          <ProfileMenuItem
+            icon={Bookmark}
+            label="Saved Events"
+            count={loadingSavedEvents ? undefined : savedEventsCount}
+            href="/profile/saved-events"
           />
         </div>
       </section>
-      
+
       <ChangeBioDialog
         isOpen={isChangeBioDialogOpen}
         onClose={() => setIsChangeBioDialogOpen(false)}
@@ -307,4 +309,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-    
