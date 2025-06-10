@@ -6,7 +6,7 @@ import type { Event, Ticket } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -155,6 +155,27 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     }
   };
 
+  const handleViewOrganizerProfile = () => {
+    if (event?.creatorId) {
+        toast({
+            title: "Feature Coming Soon!",
+            description: "Viewing organizer profiles will be available in a future update.",
+        });
+        // Future: router.push(`/profile/${event.creatorId}`);
+    }
+  };
+
+  const handleFollowOrganizer = () => {
+    if (event?.creatorId && creator) {
+        toast({
+            title: "Feature Coming Soon!",
+            description: `The ability to follow ${creator.displayName} will be available soon.`,
+        });
+        // Future: Implement actual follow logic here
+    }
+  };
+
+
   if (loadingEvent) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -244,21 +265,41 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               </div>
             )}
 
-            {/* Creator Info */}
             {loadingCreator ? (
               <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Loading organizer...</span>
               </div>
             ) : creator && (
-              <div className="flex items-center space-x-3 pt-3 mt-3 border-t">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={creator.photoURL || undefined} alt={creator.displayName} data-ai-hint="organizer avatar"/>
-                  <AvatarFallback>{creator.displayName.charAt(0).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-xs text-muted-foreground">Organized by</p>
-                  <p className="font-medium text-foreground">{creator.displayName}</p>
+              <div className="pt-3 mt-3 border-t">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={handleViewOrganizerProfile}
+                    className="flex items-center space-x-3 group hover:opacity-80 transition-opacity"
+                    disabled={!event?.creatorId}
+                    aria-label={`View profile of ${creator.displayName}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={creator.photoURL || undefined} alt={creator.displayName} data-ai-hint="organizer avatar"/>
+                      <AvatarFallback>{creator.displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Organized by</p>
+                      <p className="font-medium text-foreground group-hover:underline">{creator.displayName}</p>
+                    </div>
+                  </button>
+                  {user && event?.creatorId && user.uid !== event.creatorId && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleFollowOrganizer}
+                      className="ml-auto"
+                      aria-label={`Follow ${creator.displayName}`}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Follow
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -315,3 +356,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
+
