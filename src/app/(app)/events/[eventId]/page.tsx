@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ShareSheet } from '@/components/sharing/ShareSheet'; // Import ShareSheet
 
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
@@ -45,6 +46,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const [isGettingTicket, setIsGettingTicket] = useState(false);
   const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false);
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); // State for ShareSheet
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -201,10 +203,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleInviteFriends = () => {
-    toast({
-      title: 'Invite Friends',
-      description: 'Sharing and invite functionality will be available soon!',
-    });
+    setIsShareSheetOpen(true); // Open the share sheet
   };
 
 
@@ -271,7 +270,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{event.description}</p>
             </div>
             
-            <div className="mt-4 p-3 bg-card rounded-lg shadow-sm border">
+             <div className="mt-4 p-3 bg-card rounded-lg shadow-sm border">
               <div className="flex items-center justify-between">
                 <div> {/* Left side for attendees or placeholder */}
                   {event.attendees && event.attendees.length > 0 && typeof event.attendanceCount === 'number' ? (
@@ -408,8 +407,14 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         </AlertDialogContent>
       </AlertDialog>
 
+      {event && typeof window !== 'undefined' && (
+        <ShareSheet
+          isOpen={isShareSheetOpen}
+          onClose={() => setIsShareSheetOpen(false)}
+          eventTitle={event.title}
+          eventUrl={window.location.href}
+        />
+      )}
     </div>
   );
 }
-
-    
