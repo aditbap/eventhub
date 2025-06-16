@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, UploadCloud, Banknote, MapPin, Building, Clock, FileText, Palette, ArrowLeft } from 'lucide-react'; // Changed DollarSign to Banknote
+import { CalendarIcon, UploadCloud, Banknote, MapPin, Building, Clock, FileText, Palette, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { eventStore } from '@/lib/eventStore';
@@ -19,7 +19,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth';
+import { motion } from 'framer-motion';
 
 const createEventFormSchema = z.object({
   title: z.string().min(3, { message: 'Event title must be at least 3 characters.' }).max(100),
@@ -42,7 +43,7 @@ type CreateEventFormValues = z.infer<typeof createEventFormSchema>;
 export default function CreateEventPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const { user } = useAuth(); // Get current user
+  const { user } = useAuth();
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, reset, setValue } = useForm<CreateEventFormValues>({
     resolver: zodResolver(createEventFormSchema),
     defaultValues: {
@@ -105,7 +106,7 @@ export default function CreateEventPage() {
       attendees: [],
       attendanceCount: 0,
       isBookmarked: false,
-      creatorId: user.uid, // Add creatorId
+      creatorId: user.uid,
     };
 
     eventStore.addEvent(newEvent);
@@ -117,11 +118,15 @@ export default function CreateEventPage() {
     reset();
     setImagePreview(null);
     setSelectedFile(null);
-    // router.push('/explore'); // Optional: redirect after creation
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="min-h-screen bg-background pb-24"
+    >
       <header className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-md border-b w-full">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-muted/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
@@ -292,6 +297,6 @@ export default function CreateEventPage() {
           </Button>
         </form>
       </div>
-    </div>
+    </motion.div>
   );
 }

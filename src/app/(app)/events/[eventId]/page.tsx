@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight, Banknote } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore'; // Removed addDoc, serverTimestamp as ticket creation moves to backend
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { eventStore } from '@/lib/eventStore';
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ShareSheet } from '@/components/sharing/ShareSheet';
+import { motion } from 'framer-motion';
 
 // Midtrans Snap.js TypeScript declaration
 declare global {
@@ -34,9 +35,9 @@ declare global {
       pay: (
         snapToken: string,
         options?: {
-          onSuccess?: (result: MidtransSnapSuccessResult) => void; // Updated result type
-          onPending?: (result: MidtransSnapPendingResult) => void; // Updated result type
-          onError?: (result: MidtransSnapErrorResult) => void;   // Updated result type
+          onSuccess?: (result: MidtransSnapSuccessResult) => void;
+          onPending?: (result: MidtransSnapPendingResult) => void;
+          onError?: (result: MidtransSnapErrorResult) => void;
           onClose?: () => void;
           embedId?: string;
           redirectUrl?: string;
@@ -55,23 +56,19 @@ interface MidtransSnapSuccessResult {
   gross_amount: string;
   payment_type: string;
   transaction_time: string;
-  transaction_status: 'capture' | 'settlement' | 'pending' | 'deny' | 'expire' | 'cancel'; // More specific statuses
+  transaction_status: 'capture' | 'settlement' | 'pending' | 'deny' | 'expire' | 'cancel';
   fraud_status: 'accept' | 'challenge' | 'deny';
-  // Add other fields as needed, e.g., permata_va_number, bill_key, biller_code, etc.
   pdf_url?: string;
   finish_redirect_url?: string;
 }
 
 interface MidtransSnapPendingResult extends MidtransSnapSuccessResult {
-  // Pending results might have specific fields like VA numbers
   va_numbers?: { bank: string; va_number: string }[];
-  // ... other pending specific fields
 }
 
 interface MidtransSnapErrorResult {
   status_code: string;
-  status_message: string[]; // Error messages can be an array
-  // ... other error specific fields
+  status_message: string[];
 }
 
 
@@ -173,7 +170,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                        !['Unknown Creator', 'Error loading organizer', 'Organizer N/A'].includes(creator.displayName);
 
 
-  // This function is now called after successful server-side verification
   const handlePaymentVerificationSuccess = () => {
     toast({
       title: '🎉 Ticket Acquired!',
@@ -186,19 +182,16 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     });
   };
   
-  // This function handles ticket acquisition for FREE events directly
   const acquireFreeTicket = async () => {
     if (!user || !event) return;
     setActionInProgress(true);
     try {
-      // Call a backend endpoint to create the free ticket.
-      // This is similar to verify-payment but for free events, or adjust verify-payment to handle price=0
-      const response = await fetch('/api/midtrans/verify-payment', { // Reusing verify-payment for simplicity, can be a dedicated route
+      const response = await fetch('/api/midtrans/verify-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          order_id: `FREE-${event.id}-${user.uid}-${Date.now()}`, // Generate a unique ID for free tickets
-          clientTransactionStatus: 'free_ticket', // Indicate it's a free ticket
+          order_id: `FREE-${event.id}-${user.uid}-${Date.now()}`,
+          clientTransactionStatus: 'free_ticket',
           eventDetails: {
             id: event.id,
             title: event.title,
@@ -207,7 +200,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             location: event.location,
             imageUrl: event.imageUrl,
             imageHint: event.imageHint,
-            price: 0, // Explicitly pass 0
+            price: 0,
           },
           userId: user.uid,
         }),
@@ -277,7 +270,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             title: 'Payment Received by Midtrans',
             description: 'Verifying your payment with our server...',
           });
-          setActionInProgress(true); // Keep loading indicator active during verification
+          setActionInProgress(true);
 
           try {
             const verifyResponse = await fetch('/api/midtrans/verify-payment', {
@@ -285,8 +278,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 order_id: result.order_id,
-                clientTransactionStatus: result.transaction_status, // Pass client-observed status for logging/comparison
-                eventDetails: { // Pass necessary event details for ticket creation
+                clientTransactionStatus: result.transaction_status,
+                eventDetails: {
                     id: event.id,
                     title: event.title,
                     date: event.date,
@@ -296,7 +289,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                     imageHint: event.imageHint,
                     price: event.price,
                 },
-                userId: user.uid, // Pass user ID
+                userId: user.uid,
               }),
             });
 
@@ -374,13 +367,12 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        setShowConfirmationDialog(true); // Already has a ticket, confirm getting another
+        setShowConfirmationDialog(true);
       } else {
-        // No existing ticket
         if (!event.price || event.price <= 0) {
-          await acquireFreeTicket(); // Directly get free ticket
+          await acquireFreeTicket();
         } else {
-          await initiateMidtransPayment(); // Initiate payment for paid event
+          await initiateMidtransPayment();
         }
       }
     } catch (error) {
@@ -441,13 +433,18 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const buttonLoadingState = actionInProgress || isCheckingExistingTicket;
   const buttonText = () => {
     if (isCheckingExistingTicket) return "Checking...";
-    if (actionInProgress && event.price && event.price > 0) return "Processing..."; // Generic "Processing..."
+    if (actionInProgress && event.price && event.price > 0) return "Processing...";
     if (actionInProgress && (!event.price || event.price <=0)) return "Getting Ticket...";
     return event.price && event.price > 0 ? `Get Ticket - Rp ${event.price.toLocaleString('id-ID')}` : 'Get Free Ticket';
   };
 
   return (
-    <div className="bg-background min-h-screen">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="bg-background min-h-screen"
+    >
       <div className="relative h-[300px] sm:h-[400px] md:h-[500px] w-full">
         <Image
             src={event.imageUrl}
@@ -653,8 +650,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
           eventUrl={window.location.href}
         />
       )}
-    </div>
+    </motion.div>
   );
 }
-
-    

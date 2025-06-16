@@ -6,9 +6,9 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Ticket, Event } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react'; // Added Users, UserPlus
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore'; // Added getDoc
+import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { eventStore } from '@/lib/eventStore';
 import { ChangeBioDialog } from '@/components/profile/ChangeBioDialog';
+import { motion } from 'framer-motion';
 
 interface ProfileMenuItemProps {
   icon: React.ElementType;
@@ -49,7 +50,7 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
 };
 
 interface StatItemProps {
-  value: React.ReactNode; // Changed from string | number to React.ReactNode
+  value: React.ReactNode;
   label: string;
   href?: string;
   onClick?: () => void;
@@ -58,7 +59,7 @@ interface StatItemProps {
 const StatItem: React.FC<StatItemProps> = ({ value, label, href, onClick }) => {
   const itemContent = (
     <div className="flex flex-col items-center">
-      <p className="text-xl font-semibold text-foreground h-6 flex items-center justify-center"> {/* Added h-6 for consistent height */}
+      <p className="text-xl font-semibold text-foreground h-6 flex items-center justify-center">
         {value}
       </p>
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -97,7 +98,6 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      // Fetch tickets count
       const fetchTicketsCount = async () => {
         setLoadingTickets(true);
         try {
@@ -113,7 +113,6 @@ export default function ProfilePage() {
       };
       fetchTicketsCount();
 
-      // Fetch My Events count and Saved Events count from eventStore
       const fetchEventCountsFromStore = () => {
         setLoadingMyEvents(true);
         setLoadingSavedEvents(true);
@@ -128,7 +127,6 @@ export default function ProfilePage() {
       const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
       fetchEventCountsFromStore();
 
-      // Fetch Bio
       const fetchUserBio = async () => {
         setLoadingBio(true);
         try {
@@ -148,15 +146,14 @@ export default function ProfilePage() {
       };
       fetchUserBio();
 
-      // Simulate fetching following/followers count
       setLoadingFollowing(true);
       setLoadingFollowers(true);
       setTimeout(() => {
-        setFollowingCount(0); // Placeholder
-        setFollowersCount(0); // Placeholder
+        setFollowingCount(0);
+        setFollowersCount(0);
         setLoadingFollowing(false);
         setLoadingFollowers(false);
-      }, 700); // Simulate network delay
+      }, 700);
 
       return () => {
         unsubscribeEventStore();
@@ -176,7 +173,7 @@ export default function ProfilePage() {
     if (!user) return;
     const result = await updateUserBio(newBio);
     if (result.success) {
-      setCurrentUserBio(newBio); // Update local state to reflect change immediately
+      setCurrentUserBio(newBio);
       toast({
         title: "Bio Updated",
         description: "Your bio has been successfully updated.",
@@ -196,7 +193,12 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="min-h-screen bg-background"
+    >
       <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-transparent w-full">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-white/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
@@ -306,6 +308,6 @@ export default function ProfilePage() {
         currentBio={currentUserBio}
         onSave={handleSaveBio}
       />
-    </div>
+    </motion.div>
   );
 }

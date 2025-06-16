@@ -10,7 +10,7 @@ import { CategoryFilter } from '@/components/events/CategoryFilter';
 import { SearchIcon, SlidersHorizontal, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight, X } from 'lucide-react';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from 'next/link';
-import { UpjLogo } from '@/components/icons/UpjLogo'; // Re-added UpjLogo import
+import { UpjLogo } from '@/components/icons/UpjLogo';
 import {
   Sheet,
   SheetContent,
@@ -23,15 +23,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { eventStore } from '@/lib/eventStore';
+import { motion } from 'framer-motion';
 
 export default function ExplorePage() {
-  const [searchQuery, setSearchQuery] = useState(''); // Used for input value and redirect query
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentCategory, setCurrentCategory] = useState<Event['category'] | 'All'>('All');
   const [userLocation, setUserLocation] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
 
   const [allEvents, setAllEvents] = useState<Event[]>(() => eventStore.getEvents());
-  const [eventsForDisplay, setEventsForDisplay] = useState<Event[]>([]); // Renamed from filteredEvents
+  const [eventsForDisplay, setEventsForDisplay] = useState<Event[]>([]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const router = useRouter();
 
@@ -69,14 +70,13 @@ export default function ExplorePage() {
   useEffect(() => {
     let eventsToFilter = [...allEvents];
 
-    // Filter only by category for local display on Explore page
     if (currentCategory !== 'All') {
       eventsToFilter = eventsToFilter.filter(event => event.category === currentCategory);
     }
     
     eventsToFilter.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     setEventsForDisplay(eventsToFilter);
-  }, [allEvents, currentCategory]); // searchQuery removed from dependencies for local filtering
+  }, [allEvents, currentCategory]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0); 
@@ -85,7 +85,7 @@ export default function ExplorePage() {
   sevenDaysFromNowTarget.setDate(sevenDaysFromNowTarget.getDate() + 7); 
   sevenDaysFromNowTarget.setHours(23, 59, 59, 999);
 
-  const upcomingEvents = eventsForDisplay // Use eventsForDisplay (category-filtered only)
+  const upcomingEvents = eventsForDisplay
     .filter(event => {
       const eventDate = new Date(event.date);
       return eventDate >= today &&
@@ -93,7 +93,7 @@ export default function ExplorePage() {
     })
     .slice(0, 5);
 
-  const nearYouEvents = eventsForDisplay // Use eventsForDisplay (category-filtered only)
+  const nearYouEvents = eventsForDisplay
     .filter(e => {
       const eventDate = new Date(e.date);
       const isUpcoming = eventDate >= today; 
@@ -164,7 +164,12 @@ export default function ExplorePage() {
         </div>
       </header>
 
-      <main className="flex-grow pt-16 pb-20">
+      <motion.main
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+        className="flex-grow pt-16 pb-20"
+      >
         <div className="container mx-auto px-4">
           <CategoryFilter currentCategory={currentCategory} onSelectCategory={(cat) => setCurrentCategory(cat)} />
 
@@ -209,7 +214,7 @@ export default function ExplorePage() {
             )}
           </section>
         </div>
-      </main>
+      </motion.main>
 
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent className="w-[320px] sm:w-[400px]">
