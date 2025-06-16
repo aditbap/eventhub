@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ShareSheet } from '@/components/sharing/ShareSheet'; // Added import
 
 const filterCategories: Array<{ value: Event['category'] | 'All', label: string }> = [
   { value: 'All', label: 'All Categories' },
@@ -45,6 +46,9 @@ function EventsPageContent() {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
   const [tempFilters, setTempFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
+
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); // State for ShareSheet
+  const [shareUrl, setShareUrl] = useState(''); // State for share URL
 
   useEffect(() => {
     const eventsFromStore = eventStore.getEvents(); // Already sorted by date desc
@@ -80,6 +84,14 @@ function EventsPageContent() {
     // Events are already sorted by date descending from eventStore, so no need to re-sort unless criteria change
     setFilteredEvents(currentEvents);
   }, [searchQuery, allEvents, activeFilters]);
+
+  // Set share URL once when component mounts and window is available
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setShareUrl(window.location.href);
+    }
+  }, []);
+
 
   const handleSearchIconClick = () => {
     setSearchActive(true);
@@ -156,7 +168,7 @@ function EventsPageContent() {
             <Button
               variant="default"
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 py-2.5 h-auto"
-              onClick={() => alert('Invite functionality to be implemented!')}
+              onClick={() => setIsShareSheetOpen(true)} // Open ShareSheet
             >
               INVITE
             </Button>
@@ -245,6 +257,16 @@ function EventsPageContent() {
           </SheetClose>
         </SheetContent>
       </Sheet>
+
+      {/* Render ShareSheet */}
+      {shareUrl && (
+        <ShareSheet
+          isOpen={isShareSheetOpen}
+          onClose={() => setIsShareSheetOpen(false)}
+          eventTitle="Check out these cool events on UPJ Event Hub!"
+          eventUrl={shareUrl}
+        />
+      )}
     </div>
   );
 }
@@ -258,5 +280,4 @@ export default function AllEventsPage() {
     </Suspense>
   );
 }
-
     
