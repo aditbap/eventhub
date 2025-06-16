@@ -10,7 +10,7 @@ import { CategoryFilter } from '@/components/events/CategoryFilter';
 import { SearchIcon, SlidersHorizontal, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight, X } from 'lucide-react';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from 'next/link';
-import Image from 'next/image'; // Import next/image
+import { UpjLogo } from '@/components/icons/UpjLogo'; // Re-added UpjLogo import
 import {
   Sheet,
   SheetContent,
@@ -23,7 +23,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { eventStore } from '@/lib/eventStore';
-// import { UpjLogo } from '@/components/icons/UpjLogo'; // Removed UpjLogo import
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState(''); // Used for input value and redirect query
@@ -118,14 +117,7 @@ export default function ExplorePage() {
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-40">
         <div className="container mx-auto flex items-center justify-between h-14">
           <Link href="/explore" aria-label="Go to Explore page">
-            <Image
-              src="https://placehold.co/32x32.png" // Placeholder image URL
-              alt="UPJ EventHub Logo"
-              width={32} // Original h-8 (32px)
-              height={32} // Original h-8 (32px)
-              className="w-auto" // Maintain aspect ratio if needed, or 'h-8 w-8' for fixed
-              data-ai-hint="app logo"
-            />
+            <UpjLogo iconOnly={true} className="h-8 w-auto" fill="hsl(var(--primary-foreground))" />
           </Link>
           <div className="text-center">
             <p className="text-xs opacity-80">Current Location</p>
