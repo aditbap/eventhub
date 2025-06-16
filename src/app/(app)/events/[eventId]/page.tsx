@@ -6,7 +6,7 @@ import type { Event, Ticket, Notification } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2 } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -270,25 +270,36 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-2">About this event</h2>
               <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{event.description}</p>
             </div>
-             {event.attendanceCount !== undefined && event.attendees && event.attendees.length > 0 && (
-                <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border">
+            
+            <div className="mt-4 p-3 bg-card rounded-lg shadow-sm border">
+              <div className="flex items-center justify-between">
+                <div> {/* Left side for attendees or placeholder */}
+                  {event.attendees && event.attendees.length > 0 && typeof event.attendanceCount === 'number' ? (
                     <div className="flex items-center">
-                        <div className="flex -space-x-2 mr-3">
-                            {event.attendees.slice(0, 3).map((attendee, index) => (
-                                <Avatar key={attendee.id || index} className="h-8 w-8 border-2 border-background">
-                                    <AvatarImage src={attendee.avatarUrl} alt={attendee.name} data-ai-hint="attendee avatar"/>
-                                    <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                            ))}
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{event.attendanceCount} people attending</span>
+                      <div className="flex -space-x-2 mr-3">
+                        {event.attendees.slice(0, 3).map((attendee, index) => (
+                          <Avatar key={attendee.id || index} className="h-8 w-8 border-2 border-background">
+                            <AvatarImage src={attendee.avatarUrl} alt={attendee.name} data-ai-hint="attendee avatar"/>
+                            <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium text-foreground">{event.attendanceCount} people attending</span>
                     </div>
-                    <Button variant="default" size="sm" onClick={handleInviteFriends} className="bg-primary/10 text-primary hover:bg-primary/20">
-                        <Share2 className="mr-2 h-4 w-4" />
-                        Invite
-                    </Button>
+                  ) : (
+                     <div className="flex items-center">
+                        <Users className="mr-2 h-5 w-5 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Be the first to join or invite friends!</span>
+                    </div>
+                  )}
                 </div>
-            )}
+                {/* Right side for Invite button, always visible */}
+                <Button variant="default" size="sm" onClick={handleInviteFriends} className="bg-primary/10 text-primary hover:bg-primary/20">
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Invite
+                </Button>
+              </div>
+            </div>
           </div>
           
           <div className="space-y-4 rounded-xl border bg-card p-4 shadow-lg md:sticky md:top-20">
@@ -401,3 +412,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   );
 }
 
+    
