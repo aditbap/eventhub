@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ShareSheet } from '@/components/sharing/ShareSheet'; // Added import
+import { ShareSheet } from '@/components/sharing/ShareSheet';
+import { motion } from 'framer-motion';
 
 const filterCategories: Array<{ value: Event['category'] | 'All', label: string }> = [
   { value: 'All', label: 'All Categories' },
@@ -125,7 +126,12 @@ function EventsPageContent() {
   const currentEventsToDisplay = filteredEvents;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="flex flex-col min-h-screen bg-background"
+    >
       <header className="sticky top-0 z-30 flex items-center justify-between px-2 sm:px-4 py-3 bg-background/80 backdrop-blur-md border-b w-full h-16">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-muted/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
@@ -267,7 +273,7 @@ function EventsPageContent() {
           eventUrl={shareUrl}
         />
       )}
-    </div>
+    </motion.div>
   );
 }
 
