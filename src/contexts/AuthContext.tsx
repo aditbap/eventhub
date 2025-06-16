@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { auth, db, storage } from '@/lib/firebase'; // Using REAL Firebase, Added storage
+import { auth, db, storage } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -18,14 +18,14 @@ import {
   type User as FirebaseUser 
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // Added for storage
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter, usePathname } from 'next/navigation';
 
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  username?: string | null; // Added username
+  username: string | null; // Changed to non-optional, will be enforced
   photoURL?: string | null;
   bio?: string | null; 
 }
@@ -43,6 +43,7 @@ interface AuthContextType {
   updateUserGender: (newGender: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   updateUserProfilePicture: (file: File) => Promise<{ success: boolean, photoURL?: string, error?: { message: string, code?: string } }>;
   updateUserBio: (newBio: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>; 
+  updateUserUsername: (newUsername: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -63,13 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           userBio = data?.bio || null;
-          username = data?.username || null;
+          username = data?.username || null; // This can be null if old user or new Google sign-in
         }
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          username: username,
+          username: username, // Keep it potentially null here, AppLayout will handle redirect
           photoURL: firebaseUser.photoURL,
           bio: userBio,
         });
@@ -117,14 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: { message: "Name, email, password, and username are required." } };
     }
 
-    const normalizedUsername = usernameInput.toLowerCase();
-    // Basic validation for username format (can be expanded)
+    const normalizedUsername = usernameInput.trim().toLowerCase();
     if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
         return { success: false, error: { message: "Username must be 3-20 characters, lowercase letters, numbers, or underscores only." } };
     }
 
     try {
-      // Check if username already exists
       const usersRef = collection(db, "users");
       const qUsername = query(usersRef, where("username", "==", normalizedUsername));
       const usernameSnapshot = await getDocs(qUsername);
@@ -139,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userData = {
           uid: userCredential.user.uid,
           displayName: name,
-          username: normalizedUsername, // Store normalized username
+          username: normalizedUsername,
           email: email,
           photoURL: userCredential.user.photoURL || null,
           bio: null, 
@@ -148,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         await setDoc(doc(db, "users", userCredential.user.uid), userData);
 
-        const loggedInUser = { 
+        const loggedInUser: User = { 
           uid: userCredential.user.uid, 
           email: userCredential.user.email, 
           displayName: name,
@@ -179,7 +178,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDoc = await getDoc(userDocRef);
         let userBio = null;
-        let username = null; // Google users won't have a username set by default here
+        let username = null;
 
         const googleUserData: any = { 
             uid: firebaseUser.uid,
@@ -192,19 +191,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!userDoc.exists()) {
           googleUserData.createdAt = serverTimestamp();
           googleUserData.bio = null; 
-          // Username is not set here for Google Sign-In for now
+          googleUserData.username = null; // New Google users won't have a username yet
           await setDoc(userDocRef, googleUserData);
           userBio = null;
         } else {
            const existingData = userDoc.data();
            userBio = existingData?.bio || null;
-           username = existingData?.username || null; // Keep existing username if any
+           username = existingData?.username || null; // Preserve existing username if any
            await updateDoc(userDocRef, { 
-            ...googleUserData, // Update with latest Google info
             displayName: firebaseUser.displayName || existingData?.displayName || null,
             photoURL: firebaseUser.photoURL || existingData?.photoURL || null,
-            // Do not overwrite username if it exists from a previous registration
-            username: username, 
+            username: username, // Keep username as is from DB
             updatedAt: serverTimestamp(),
           });
         }
@@ -212,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          username: username, // May be null
+          username: username, // This could be null
           photoURL: firebaseUser.photoURL,
           bio: userBio,
         });
@@ -267,26 +264,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const authUpdatePromise = updateProfile(currentUser, { displayName: trimmedNewName });
       const userDocRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userDocRef);
-      
+            
       const firestoreData: any = {
         displayName: trimmedNewName,
         updatedAt: serverTimestamp()
       };
       
-      let firestoreUpdatePromise;
-      if (docSnap.exists()) {
-        firestoreUpdatePromise = updateDoc(userDocRef, firestoreData);
-      } else {
-        firestoreData.uid = currentUser.uid;
-        firestoreData.email = currentUser.email || null;
-        firestoreData.photoURL = currentUser.photoURL || null;
-        firestoreData.username = docSnap.data()?.username || null; // Preserve username
-        firestoreData.createdAt = serverTimestamp();
-        firestoreUpdatePromise = setDoc(userDocRef, firestoreData);
-      }
+      await updateDoc(userDocRef, firestoreData); // Assumes doc exists for logged-in user
+      await authUpdatePromise;
 
-      await Promise.all([authUpdatePromise, firestoreUpdatePromise]);
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
       return { success: true };
 
@@ -296,6 +282,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
   
+  const updateUserUsername = useCallback(async (newUsernameInput: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { success: false, error: { message: "No user logged in." } };
+    }
+    
+    const normalizedNewUsername = newUsernameInput.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(normalizedNewUsername)) {
+        return { success: false, error: { message: "Username must be 3-20 characters, lowercase letters, numbers, or underscores only." } };
+    }
+
+    try {
+      // Check for username uniqueness, excluding the current user's document if they already have one
+      const usersRef = collection(db, "users");
+      const qUsername = query(usersRef, where("username", "==", normalizedNewUsername));
+      const usernameSnapshot = await getDocs(qUsername);
+      
+      let isTaken = false;
+      usernameSnapshot.forEach(docSnap => {
+        if (docSnap.id !== currentUser.uid) { // Username is taken by someone else
+          isTaken = true;
+        }
+      });
+
+      if (isTaken) {
+        return { success: false, error: { message: "Username is already taken. Please choose another one." } };
+      }
+
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef); // Get current doc to preserve other fields
+
+      const firestoreData: any = {
+        username: normalizedNewUsername,
+        updatedAt: serverTimestamp()
+      };
+
+      if (userDocSnap.exists()) {
+        await updateDoc(userDocRef, firestoreData);
+      } else {
+        // This case should ideally not happen for a logged-in user, but handle defensively
+        await setDoc(userDocRef, {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName,
+          photoURL: currentUser.photoURL,
+          bio: null,
+          ...firestoreData, // includes username and updatedAt
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setUser(prevUser => prevUser ? { ...prevUser, username: normalizedNewUsername } : null);
+      return { success: true };
+
+    } catch (err: any) {
+      console.warn(`AuthContext: Failed to update username. Error Code: ${err.code}, Message: ${err.message}`, err);
+      return { success: false, error: { message: err.message || "Could not update username.", code: err.code } };
+    }
+  }, []);
+
+
   const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
     const currentUser = auth.currentUser;
     if (!currentUser || !currentUser.email) {
@@ -331,24 +378,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userDocRef);
-
       const birthDateData: any = {
         birthDate: newBirthDate,
         updatedAt: serverTimestamp()
       };
-
-      if (docSnap.exists()) {
-        await updateDoc(userDocRef, birthDateData);
-      } else {
-        birthDateData.uid = currentUser.uid;
-        birthDateData.displayName = currentUser.displayName || null;
-        birthDateData.email = currentUser.email || null;
-        birthDateData.photoURL = currentUser.photoURL || null;
-        birthDateData.username = docSnap.data()?.username || null; // Preserve username
-        birthDateData.createdAt = serverTimestamp();
-        await setDoc(userDocRef, birthDateData);
-      }
+      await updateDoc(userDocRef, birthDateData); // Assumes doc exists for logged-in user
       return { success: true };
     } catch (err: any) {
       console.warn(`AuthContext: Failed to update user birth date. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -364,24 +398,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userDocRef);
-
       const genderData: any = {
         gender: newGender,
         updatedAt: serverTimestamp()
       };
-
-      if (docSnap.exists()) {
-        await updateDoc(userDocRef, genderData);
-      } else {
-        genderData.uid = currentUser.uid;
-        genderData.displayName = currentUser.displayName || null;
-        genderData.email = currentUser.email || null;
-        genderData.photoURL = currentUser.photoURL || null;
-        genderData.username = docSnap.data()?.username || null; // Preserve username
-        genderData.createdAt = serverTimestamp();
-        await setDoc(userDocRef, genderData);
-      }
+      await updateDoc(userDocRef, genderData); // Assumes doc exists
       return { success: true };
     } catch (err: any) {
       console.warn(`AuthContext: Failed to update user gender. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -408,25 +429,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const authUpdatePromise = updateProfile(currentUser, { photoURL: downloadURL });
       
       const userDocRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userDocRef);
-      let firestorePromise;
       const firestoreData: any = {
         photoURL: downloadURL,
         updatedAt: serverTimestamp(),
       };
 
-      if (docSnap.exists()) {
-        firestorePromise = updateDoc(userDocRef, firestoreData);
-      } else {
-        firestoreData.uid = currentUser.uid;
-        firestoreData.displayName = currentUser.displayName || null;
-        firestoreData.email = currentUser.email || null;
-        firestoreData.username = docSnap.data()?.username || null; // Preserve username
-        firestoreData.createdAt = serverTimestamp();
-        firestorePromise = setDoc(userDocRef, firestoreData);
-      }
+      await updateDoc(userDocRef, firestoreData); // Assumes doc exists
+      await authUpdatePromise;
 
-      await Promise.all([authUpdatePromise, firestorePromise]);
       setUser(prevUser => prevUser ? { ...prevUser, photoURL: downloadURL } : null);
       return { success: true, photoURL: downloadURL };
 
@@ -460,24 +470,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const userDocRef = doc(db, "users", currentUser.uid);
-      const docSnap = await getDoc(userDocRef);
-
       const bioData: any = { 
         bio: newBio,
         updatedAt: serverTimestamp()
       };
-
-      if (docSnap.exists()) {
-        await updateDoc(userDocRef, bioData);
-      } else {
-        bioData.uid = currentUser.uid;
-        bioData.displayName = currentUser.displayName || null;
-        bioData.email = currentUser.email || null;
-        bioData.photoURL = currentUser.photoURL || null;
-        bioData.username = docSnap.data()?.username || null; // Preserve username
-        bioData.createdAt = serverTimestamp(); 
-        await setDoc(userDocRef, bioData);
-      }
+      await updateDoc(userDocRef, bioData); // Assumes doc exists
       setUser(prevUser => prevUser ? { ...prevUser, bio: newBio } : null);
       return { success: true };
     } catch (err: any) {
@@ -488,19 +485,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    const protectedAppPaths = ['/explore', '/events', '/create', '/map', '/profile', '/settings', '/new-password', '/social', '/users'];
-    const isProtectedPath = protectedAppPaths.some(p => pathname.startsWith(p));
+    if (loading) return; // Wait for auth state to be determined
 
-    if (!loading && !user && isProtectedPath) {
-      router.replace('/login');
-    }
-  }, [user, loading, pathname, router]);
+    const authPages = ['/login', '/register', '/reset-password', '/set-username'];
+    const isAuthPage = authPages.includes(pathname);
+    const isRootPage = pathname === '/';
 
-  useEffect(() => {
-    const authPagesForRedirect = ['/login', '/register', '/reset-password']; 
-    
-    if (!loading && user && (authPagesForRedirect.includes(pathname) || pathname === '/')) {
-      router.replace('/explore');
+    if (user) {
+      if (!user.username && pathname !== '/set-username' && !authPages.includes(pathname) && !isRootPage) {
+        // User logged in but no username, and not on set-username page or other auth pages
+        router.replace('/set-username');
+      } else if (isAuthPage || isRootPage) {
+        // User logged in and on an auth page or root, redirect to explore
+        router.replace('/explore');
+      }
+    } else {
+      // No user logged in
+      if (!isAuthPage && !isRootPage) { // Not on an auth page and not on root
+        router.replace('/login');
+      }
     }
   }, [user, loading, pathname, router]);
 
@@ -514,6 +517,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout, 
         loginWithGoogle, 
         updateUserName, 
+        updateUserUsername,
         changePassword, 
         updateUserBirthDate, 
         updateUserGender,
