@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import type { Ticket, Event } from '@/types';
+import type { Ticket, Event, PublicUserProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react';
@@ -21,7 +21,7 @@ import { motion } from 'framer-motion';
 interface ProfileMenuItemProps {
   icon: React.ElementType;
   label: string;
-  count?: number;
+  count?: number | React.ReactNode; // Allow ReactNode for loader
   href?: string;
   onClick?: () => void;
 }
@@ -33,7 +33,11 @@ const ProfileMenuItem: React.FC<ProfileMenuItemProps> = ({ icon: Icon, label, co
         <div className="flex items-center">
           <Icon className="h-6 w-6 mr-3 text-primary" />
           <span className="text-base font-medium text-foreground">{label}</span>
-          {typeof count !== 'undefined' && <span className="text-base text-muted-foreground ml-1">({count})</span>}
+          {typeof count !== 'undefined' && count !== null && (
+            <span className="text-base text-muted-foreground ml-1 flex items-center">
+              ({count})
+            </span>
+          )}
         </div>
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
       </div>
@@ -78,28 +82,29 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, href, onClick }) => {
 
 export default function ProfilePage() {
   const { user, logout, loading: authLoading, updateUserBio } = useAuth();
-  const [ticketsCount, setTicketsCount] = useState<number>(0);
-  const [myEventsCount, setMyEventsCount] = useState<number>(0);
-  const [savedEventsCount, setSavedEventsCount] = useState<number>(0);
-  const [loadingTickets, setLoadingTickets] = useState(true);
-  const [loadingMyEvents, setLoadingMyEvents] = useState(true);
-  const [loadingSavedEvents, setLoadingSavedEvents] = useState(true);
+  const [ticketsCount, setTicketsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
+  const [myEventsCount, setMyEventsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
+  const [savedEventsCount, setSavedEventsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
   const [currentUserBio, setCurrentUserBio] = useState<string | null>(null);
   const [loadingBio, setLoadingBio] = useState(true);
   const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false);
 
-  const [followingCount, setFollowingCount] = useState<number>(0);
-  const [followersCount, setFollowersCount] = useState<number>(0);
-  const [loadingFollowing, setLoadingFollowing] = useState(true);
-  const [loadingFollowers, setLoadingFollowers] = useState(true);
+  const [followingCount, setFollowingCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
+  const [followersCount, setFollowersCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
+  const [loadingFollowCounts, setLoadingFollowCounts] = useState(true);
 
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     if (user) {
+      setLoadingBio(true);
+      setLoadingFollowCounts(true);
+      setTicketsCount(<Loader2 className="h-4 w-4 animate-spin" />);
+      setMyEventsCount(<Loader2 className="h-4 w-4 animate-spin" />);
+      setSavedEventsCount(<Loader2 className="h-4 w-4 animate-spin" />);
+
       const fetchTicketsCount = async () => {
-        setLoadingTickets(true);
         try {
           const ticketsRef = collection(db, 'userTickets');
           const q = query(ticketsRef, where('userId', '==', user.uid));
@@ -107,65 +112,65 @@ export default function ProfilePage() {
           setTicketsCount(querySnapshot.docs.length);
         } catch (error: any) {
           console.error('Error fetching tickets for count:', error);
-        } finally {
-          setLoadingTickets(false);
+          setTicketsCount(0); // Set to 0 on error
         }
       };
       fetchTicketsCount();
 
       const fetchEventCountsFromStore = () => {
-        setLoadingMyEvents(true);
-        setLoadingSavedEvents(true);
         const allEvents = eventStore.getEvents();
         const userCreatedEvents = allEvents.filter(event => event.creatorId === user.uid);
         setMyEventsCount(userCreatedEvents.length);
-        setLoadingMyEvents(false);
         const userSavedEvents = allEvents.filter(event => event.isBookmarked === true);
         setSavedEventsCount(userSavedEvents.length);
-        setLoadingSavedEvents(false);
       };
       const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
       fetchEventCountsFromStore();
 
-      const fetchUserBio = async () => {
-        setLoadingBio(true);
+      const fetchUserBioAndFollows = async () => {
         try {
           const userDocRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(userDocRef);
+          const followersColRef = collection(db, 'users', user.uid, 'followers');
+          const followingColRef = collection(db, 'users', user.uid, 'following');
+
+          const [docSnap, followersSnap, followingSnap] = await Promise.all([
+            getDoc(userDocRef),
+            getDocs(followersColRef),
+            getDocs(followingColRef)
+          ]);
+
           if (docSnap.exists()) {
             setCurrentUserBio(docSnap.data()?.bio || null);
           } else {
             setCurrentUserBio(null);
           }
+          setFollowersCount(followersSnap.size);
+          setFollowingCount(followingSnap.size);
+
         } catch (error) {
-          console.error("Error fetching user bio:", error);
+          console.error("Error fetching user data/follows:", error);
           setCurrentUserBio(null);
+          setFollowersCount(0);
+          setFollowingCount(0);
         } finally {
           setLoadingBio(false);
+          setLoadingFollowCounts(false);
         }
       };
-      fetchUserBio();
-
-      setLoadingFollowing(true);
-      setLoadingFollowers(true);
-      setTimeout(() => {
-        setFollowingCount(0);
-        setFollowersCount(0);
-        setLoadingFollowing(false);
-        setLoadingFollowers(false);
-      }, 700);
+      fetchUserBioAndFollows();
 
       return () => {
         unsubscribeEventStore();
       };
 
     } else if (!authLoading) {
-      setLoadingTickets(false);
-      setLoadingMyEvents(false);
-      setLoadingSavedEvents(false);
       setLoadingBio(false);
-      setLoadingFollowing(false);
-      setLoadingFollowers(false);
+      setLoadingFollowCounts(false);
+      setTicketsCount(0);
+      setMyEventsCount(0);
+      setSavedEventsCount(0);
+      setFollowersCount(0);
+      setFollowingCount(0);
     }
   }, [user, authLoading]);
 
@@ -191,6 +196,12 @@ export default function ProfilePage() {
   if (authLoading || !user) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
+  
+  const isLoadingCounts = typeof ticketsCount !== 'number' || 
+                           typeof myEventsCount !== 'number' || 
+                           typeof savedEventsCount !== 'number' ||
+                           loadingFollowCounts;
+
 
   return (
     <motion.div
@@ -258,20 +269,20 @@ export default function ProfilePage() {
           </Button>
 
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
-            <StatItem
-              value={loadingMyEvents ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
+             <StatItem
+              value={loadingFollowCounts || typeof myEventsCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
               label="My Events"
               href="/profile/my-events"
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
-              value={loadingFollowing ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
+              value={loadingFollowCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
               label="Following"
               href="/profile/following"
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
-              value={loadingFollowers ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
+              value={loadingFollowCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
               label="Followers"
               href="/profile/followers"
             />
@@ -284,19 +295,19 @@ export default function ProfilePage() {
           <ProfileMenuItem
             icon={TicketIconLucide}
             label="My Tickets"
-            count={loadingTickets ? undefined : ticketsCount}
+            count={isLoadingCounts ? <Loader2 className="h-4 w-4 animate-spin" /> : ticketsCount as number}
             href="/profile/my-tickets"
           />
           <ProfileMenuItem
             icon={CalendarDays}
             label="My Events"
-            count={loadingMyEvents ? undefined : myEventsCount}
+            count={isLoadingCounts ? <Loader2 className="h-4 w-4 animate-spin" /> : myEventsCount as number}
             href="/profile/my-events"
           />
           <ProfileMenuItem
             icon={Bookmark}
             label="Saved Events"
-            count={loadingSavedEvents ? undefined : savedEventsCount}
+            count={isLoadingCounts ? <Loader2 className="h-4 w-4 animate-spin" /> : savedEventsCount as number}
             href="/profile/saved-events"
           />
         </div>

@@ -6,46 +6,51 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import type { User as AuthUser } from '@/contexts/AuthContext'; // Renamed to avoid conflict
-import type { Event } from '@/types';
+import type { Event, Notification, PublicUserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays } from 'lucide-react';
+import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, MessageSquare } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-
-interface PublicUserProfile {
-  uid: string;
-  displayName: string | null;
-  photoURL?: string | null;
-  bio?: string | null;
-}
+import { motion } from 'framer-motion';
 
 interface StatItemProps {
   value: string | number | React.ReactNode;
   label: string;
+  onClick?: () => void;
+  className?: string;
 }
 
-const StatItem: React.FC<StatItemProps> = ({ value, label }) => (
-  <div className="flex flex-col items-center">
-    <p className="text-2xl font-bold text-foreground">
-      {value}
-    </p>
-    <p className="text-xs text-muted-foreground">{label}</p>
-  </div>
-);
+const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className }) => {
+  const content = (
+    <div className="flex flex-col items-center">
+      <p className="text-xl font-semibold text-foreground h-6 flex items-center justify-center">
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+  if (onClick) {
+    return (
+        <button onClick={onClick} className={cn("text-center hover:opacity-80 transition-opacity", className)}>
+            {content}
+        </button>
+    );
+  }
+  return <div className={cn("text-center", className)}>{content}</div>;
+};
 
 
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const { user: currentUser, loading: currentUserLoading } = useAuth(); // Currently logged-in user
+  const { user: currentUser, loading: currentUserLoading } = useAuth();
   const { toast } = useToast();
 
   const userId = params.userId as string;
@@ -53,15 +58,22 @@ export default function UserProfilePage() {
   const [profileUser, setProfileUser] = useState<PublicUserProfile | null>(null);
   const [userEvents, setUserEvents] = useState<Event[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false); // Mock state
-  const [followersCount, setFollowersCount] = useState(346); // Mock
-  const [followingCount, setFollowingCount] = useState(1304); // Mock
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loadingFollowStatus, setLoadingFollowStatus] = useState(true);
+  const [followActionInProgress, setFollowActionInProgress] = useState(false);
+
+  const [followersCount, setFollowersCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
+  const [followingCount, setFollowingCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
 
   useEffect(() => {
     if (!userId) return;
 
-    const fetchUserProfile = async () => {
+    const fetchUserProfileAndCounts = async () => {
       setLoadingProfile(true);
+      setLoadingFollowStatus(true);
+      setFollowersCount(<Loader2 className="h-4 w-4 animate-spin" />);
+      setFollowingCount(<Loader2 className="h-4 w-4 animate-spin" />);
       try {
         const userDocRef = doc(db, 'users', userId);
         const userDocSnap = await getDoc(userDocRef);
@@ -75,46 +87,101 @@ export default function UserProfilePage() {
             bio: data.bio || undefined,
           });
 
-          // Fetch user's events from eventStore
           const allEvents = eventStore.getEvents();
           const eventsCreatedByUser = allEvents.filter(event => event.creatorId === userId);
           setUserEvents(eventsCreatedByUser.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
+          // Fetch follower/following counts
+          const followersColRef = collection(db, 'users', userId, 'followers');
+          const followingColRef = collection(db, 'users', userId, 'following');
+          const [followersSnap, followingSnap] = await Promise.all([
+            getDocs(followersColRef),
+            getDocs(followingColRef)
+          ]);
+          setFollowersCount(followersSnap.size);
+          setFollowingCount(followingSnap.size);
+
+          // Check if current user is following this profileUser
+          if (currentUser && currentUser.uid !== userId) {
+            const currentUserFollowingRef = doc(db, 'users', currentUser.uid, 'following', userId);
+            const followingDocSnap = await getDoc(currentUserFollowingRef);
+            setIsFollowing(followingDocSnap.exists());
+          }
         } else {
-          console.warn(`User document not found for ID: ${userId}`);
-          // Optionally redirect to a 404 page or show error
-          setProfileUser(null); // Or handle as "user not found"
+          setProfileUser(null);
+          setFollowersCount(0);
+          setFollowingCount(0);
         }
       } catch (error) {
         console.error('Error fetching user profile:', error);
         setProfileUser(null);
+        setFollowersCount(0);
+        setFollowingCount(0);
+        toast({ title: "Error", description: "Could not load user profile.", variant: "destructive" });
       } finally {
         setLoadingProfile(false);
+        setLoadingFollowStatus(false);
       }
     };
 
-    fetchUserProfile();
-  }, [userId]);
+    fetchUserProfileAndCounts();
+  }, [userId, currentUser, toast]);
 
-  const handleFollowToggle = () => {
-    if (!currentUser) {
-        toast({ title: "Login Required", description: "Please log in to follow users.", variant: "destructive" });
-        return;
+  const handleFollowToggle = async () => {
+    if (!currentUser || !profileUser || currentUser.uid === profileUser.uid || followActionInProgress || loadingFollowStatus) {
+      if (!currentUser) toast({ title: "Login Required", description: "Please log in to follow users.", variant: "destructive" });
+      return;
     }
-    if (currentUser.uid === userId) {
-        toast({ title: "Action Not Allowed", description: "You cannot follow yourself.", variant: "destructive" });
-        return;
+
+    setFollowActionInProgress(true);
+    const batch = writeBatch(db);
+    const currentUserFollowingRef = doc(db, 'users', currentUser.uid, 'following', profileUser.uid);
+    const targetUserFollowersRef = doc(db, 'users', profileUser.uid, 'followers', currentUser.uid);
+
+    try {
+      if (isFollowing) { // Unfollow
+        batch.delete(currentUserFollowingRef);
+        batch.delete(targetUserFollowersRef);
+        await batch.commit();
+        setIsFollowing(false);
+        setFollowersCount(prev => typeof prev === 'number' ? prev - 1 : 0);
+        toast({ title: `Unfollowed ${profileUser.displayName}` });
+      } else { // Follow
+        batch.set(currentUserFollowingRef, { displayName: profileUser.displayName, photoURL: profileUser.photoURL || null, followedAt: serverTimestamp() });
+        batch.set(targetUserFollowersRef, { displayName: currentUser.displayName, photoURL: currentUser.photoURL || null, followerAt: serverTimestamp() });
+
+        // Create notification for the followed user
+        const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
+            userId: profileUser.uid,
+            category: 'social',
+            title: `${currentUser.displayName || 'Someone'} started following you`,
+            message: `You have a new follower! Check out their profile.`,
+            relatedUserId: currentUser.uid,
+            relatedUserName: currentUser.displayName,
+            relatedUserAvatar: currentUser.photoURL,
+            link: `/users/${currentUser.uid}`,
+            isRead: false,
+            icon: 'UserPlus',
+        };
+        const notificationsColRef = collection(db, 'userNotifications');
+        // Firestore will auto-generate an ID for the notification document
+        const newNotificationRef = doc(notificationsColRef); // Create a new doc reference
+        batch.set(newNotificationRef, { ...notificationData, timestamp: serverTimestamp() });
+
+        await batch.commit();
+        setIsFollowing(true);
+        setFollowersCount(prev => typeof prev === 'number' ? prev + 1 : 1);
+        toast({ title: `Followed ${profileUser.displayName}!` });
+      }
+    } catch (error) {
+      console.error("Error toggling follow state:", error);
+      toast({ title: "Error", description: "Could not update follow status.", variant: "destructive" });
+    } finally {
+      setFollowActionInProgress(false);
     }
-    setIsFollowing(!isFollowing); // Toggle mock state
-    setFollowersCount(prev => isFollowing ? prev -1 : prev + 1); // Adjust mock follower count
-    toast({
-      title: isFollowing ? `Unfollowed ${profileUser?.displayName || 'User'}` : `Followed ${profileUser?.displayName || 'User'}!`,
-      description: `You are now ${isFollowing ? 'not following' : 'following'} this user. (Placeholder)`,
-    });
   };
   
   const isCurrentUserProfile = useMemo(() => currentUser?.uid === userId, [currentUser, userId]);
-
 
   if (loadingProfile || currentUserLoading) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -122,19 +189,28 @@ export default function UserProfilePage() {
 
   if (!profileUser) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeInOut" }}
+        className="flex flex-col items-center justify-center min-h-screen bg-background p-4"
+      >
         <h1 className="text-2xl font-bold mb-4">User Not Found</h1>
         <p className="text-muted-foreground mb-6">The profile you are looking for does not exist or could not be loaded.</p>
         <Button onClick={() => router.back()}>Go Back</Button>
-      </div>
+      </motion.div>
     );
   }
   
   const avatarSrc = profileUser.photoURL || `https://placehold.co/128x128.png?text=${profileUser.displayName?.charAt(0) || 'U'}`;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header Section */}
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="min-h-screen bg-background"
+    >
       <div className="relative bg-gradient-to-b from-emerald-100/40 via-emerald-50/20 to-background/0 pt-4 pb-8 px-4">
         <div className="absolute top-4 left-4 z-10">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="bg-black/10 hover:bg-black/20 text-foreground rounded-full">
@@ -155,28 +231,42 @@ export default function UserProfilePage() {
              <p className="text-sm text-muted-foreground mt-1 italic">No bio yet.</p>
           )}
 
-          {/* Stats Section */}
           <div className="flex justify-around items-center w-full max-w-xs sm:max-w-sm mt-6 py-3 bg-card/70 backdrop-blur-sm rounded-xl shadow">
             <StatItem value={userEvents.length} label="Events" />
             <Separator orientation="vertical" className="h-10 bg-border/50" />
-            <StatItem value={followingCount} label="Following" />
+            <StatItem 
+                value={loadingFollowStatus && typeof followingCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount} 
+                label="Following" 
+                onClick={profileUser ? () => router.push(`/profile/following?userId=${profileUser.uid}&userName=${profileUser.displayName}`) : undefined}
+                className={profileUser ? "cursor-pointer" : ""}
+            />
             <Separator orientation="vertical" className="h-10 bg-border/50" />
-            <StatItem value={followersCount} label="Followers" />
+            <StatItem 
+                value={loadingFollowStatus && typeof followersCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount} 
+                label="Followers" 
+                onClick={profileUser ? () => router.push(`/profile/followers?userId=${profileUser.uid}&userName=${profileUser.displayName}`) : undefined}
+                className={profileUser ? "cursor-pointer" : ""}
+            />
           </div>
 
-          {/* Follow/Edit Button */}
           {!isCurrentUserProfile && currentUser && (
-            <Button 
-              onClick={handleFollowToggle} 
-              variant={isFollowing ? "outline" : "default"}
-              className={cn(
-                "mt-6 w-full max-w-xs h-11 text-base font-semibold",
-                isFollowing ? "border-primary text-primary hover:bg-primary/10" : "bg-primary text-primary-foreground hover:bg-primary/90"
-              )}
-            >
-              {isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>}
-              {isFollowing ? 'Following' : 'Follow'}
-            </Button>
+            <div className="mt-6 w-full max-w-xs flex space-x-2">
+                <Button 
+                  onClick={handleFollowToggle} 
+                  variant={isFollowing ? "outline" : "default"}
+                  className={cn(
+                    "flex-1 h-11 text-base font-semibold",
+                    isFollowing ? "border-primary text-primary hover:bg-primary/10" : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  )}
+                  disabled={loadingFollowStatus || followActionInProgress}
+                >
+                  {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>)}
+                  {loadingFollowStatus ? 'Checking...' : (followActionInProgress ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Following' : 'Follow'))}
+                </Button>
+                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" disabled> {/* Placeholder for Message */}
+                    <MessageSquare className="mr-2 h-5 w-5"/> Message
+                </Button>
+            </div>
           )}
            {isCurrentUserProfile && (
              <Button onClick={() => router.push('/settings')} variant="outline" className="mt-6 w-full max-w-xs h-11 text-base font-semibold">
@@ -186,7 +276,6 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Tabs Section */}
       <Tabs defaultValue="event" className="w-full px-2 sm:px-4 -mt-2">
         <TabsList className="grid w-full grid-cols-2 bg-transparent p-0 border-b rounded-none mb-4">
           <TabsTrigger 
@@ -220,13 +309,18 @@ export default function UserProfilePage() {
           )}
         </TabsContent>
         <TabsContent value="about" className="pb-20">
-          <div className="text-center py-10 text-muted-foreground bg-card rounded-lg shadow-sm">
-            <p>More information about {profileUser.displayName} will be available here soon.</p>
-            {profileUser.bio && <p className="mt-4 italic">Current Bio: "{profileUser.bio}"</p>}
+          <div className="p-4 space-y-3 text-sm bg-card rounded-lg shadow-sm">
+            <h3 className="text-lg font-semibold text-foreground">About {profileUser.displayName}</h3>
+            {profileUser.bio ? (
+                <p className="text-muted-foreground whitespace-pre-line">{profileUser.bio}</p>
+            ) : (
+                <p className="text-muted-foreground italic">This user hasn't added a bio yet.</p>
+            )}
+            {/* Placeholder for more about info like join date, etc. */}
+            <p className="text-xs text-muted-foreground/70 pt-2">User ID: {profileUser.uid}</p>
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }
-

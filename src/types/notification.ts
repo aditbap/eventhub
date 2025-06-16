@@ -7,12 +7,15 @@ export interface Notification {
   category: NotificationCategory;
   title: string;
   message: string;
-  relatedEventId?: string; // Optional: links to an event
-  relatedEventName?: string; // Optional: event name for display
-  relatedEventImageUrl?: string; // Optional: event image for display
-  relatedEventImageHint?: string; // Optional: AI hint for event image
-  link?: string; // Optional: a specific link for the notification to navigate to
+  relatedEventId?: string; 
+  relatedEventName?: string; 
+  relatedEventImageUrl?: string; 
+  relatedEventImageHint?: string; 
+  relatedUserId?: string; // For social notifications, UID of the actor
+  relatedUserName?: string; // For social notifications, name of the actor
+  relatedUserAvatar?: string; // For social notifications, avatar of the actor
+  link?: string; 
   timestamp: string; // ISO string, from Firestore serverTimestamp
   isRead: boolean;
-  icon?: string; // Lucide icon name string, e.g., 'Ticket', 'CalendarClock'
+  icon?: string; 
 }
