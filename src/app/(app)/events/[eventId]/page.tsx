@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import type { Event, Ticket } from '@/types';
+import type { Event, Ticket, Notification } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +87,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     }
   }, [event]);
 
-  // Determine if creator info is valid for follow/profile actions
   const isRealCreator = creator && event?.creatorId &&
                        !['Unknown Creator', 'Error loading organizer', 'Organizer N/A'].includes(creator.displayName);
 
@@ -107,14 +106,34 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         eventImageHint: event.imageHint || undefined,
       };
       
-      await addDoc(collection(db, "userTickets"), {
+      const ticketDocRef = await addDoc(collection(db, "userTickets"), {
         ...ticketData,
         purchaseDate: serverTimestamp() 
       });
 
+      // Create a notification for successful ticket acquisition
+      const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
+        userId: user.uid,
+        category: 'event_registration',
+        title: 'Ticket Acquired!',
+        message: `You've successfully got a ticket for ${event.title}.`,
+        relatedEventId: event.id,
+        relatedEventName: event.title,
+        relatedEventImageUrl: event.imageUrl,
+        relatedEventImageHint: event.imageHint,
+        link: `/profile/my-tickets?ticketId=${ticketDocRef.id}`,
+        isRead: false,
+        icon: 'Ticket',
+      };
+
+      await addDoc(collection(db, "userNotifications"), {
+        ...notificationData,
+        timestamp: serverTimestamp()
+      });
+
       toast({
         title: '🎉 Ticket Acquired!',
-        description: `You've successfully got a ticket for ${event.title}.`,
+        description: `You've successfully got a ticket for ${event.title}. A notification has been sent.`,
         action: (
           <Button variant="outline" size="sm" onClick={() => router.push('/profile/my-tickets')}>
             View Ticket
@@ -122,10 +141,10 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         ),
       });
     } catch (error) {
-      console.error('Error getting ticket:', error);
+      console.error('Error getting ticket or creating notification:', error);
       toast({
         title: 'Error',
-        description: 'Could not get your ticket. Please try again.',
+        description: 'Could not get your ticket or send notification. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -160,12 +179,11 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleViewOrganizerProfile = () => {
-    if (event?.creatorId) { // Gated by creatorId existing on event
+    if (event?.creatorId) { 
         toast({
             title: "Feature Coming Soon!",
             description: "Viewing organizer profiles will be available in a future update.",
         });
-        // Future: router.push(`/profile/${event.creatorId}`);
     }
   };
 
@@ -175,13 +193,12 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             title: "Feature Coming Soon!",
             description: `The ability to follow ${creator.displayName} will be available soon.`,
         });
-    } else if (event?.creatorId) { // If there's a creatorId but not "real" info (e.g. error or unknown)
+    } else if (event?.creatorId) {
          toast({
             title: "Feature Coming Soon!",
             description: "Following organizers will be available in a future update.",
         });
     }
-    // If no event.creatorId, follow button wouldn't render anyway.
   };
 
 
@@ -366,5 +383,3 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
-
-    
