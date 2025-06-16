@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, Wrench, Users, type Icon } from 'lucide-react'; // Added Users icon
+import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react'; // Removed Wrench
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -19,9 +19,9 @@ const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
-  { href: '/social', label: 'Social', icon: Users, isDisabled: true }, // New Social tab
+  { href: '/social', label: 'Social', icon: Users, isDisabled: true },
   { href: '/profile', label: 'Profile', icon: UserCircle },
-  // { href: '/map', label: 'Map', icon: Wrench, isDisabled: true }, // Map can be moved or removed if too many items
+  // { href: '/map', label: 'Map', icon: Wrench, isDisabled: true }, // Map tab removed
 ];
 
 
@@ -29,6 +29,7 @@ export function BottomNavigationBar() {
   const pathname = usePathname();
 
   // Filter out the Map item for mobile view if it makes the bar too crowded
+  // This filter is now redundant as Map is removed from navItems, but kept for clarity if other items are conditionally removed later.
   const mobileNavItems = navItems.filter(item => item.label !== 'Map');
 
 
