@@ -12,7 +12,7 @@ import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc }
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, MessageSquare } from 'lucide-react';
+import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, MessageSquare, AtSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import { useToast } from '@/hooks/use-toast';
@@ -83,6 +83,7 @@ export default function UserProfilePage() {
           setProfileUser({
             uid: userDocSnap.id,
             displayName: data.displayName || 'User',
+            username: data.username || null, // Added username
             photoURL: data.photoURL || undefined,
             bio: data.bio || undefined,
           });
@@ -91,7 +92,6 @@ export default function UserProfilePage() {
           const eventsCreatedByUser = allEvents.filter(event => event.creatorId === userId);
           setUserEvents(eventsCreatedByUser.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
 
-          // Fetch follower/following counts
           const followersColRef = collection(db, 'users', userId, 'followers');
           const followingColRef = collection(db, 'users', userId, 'following');
           const [followersSnap, followingSnap] = await Promise.all([
@@ -101,7 +101,6 @@ export default function UserProfilePage() {
           setFollowersCount(followersSnap.size);
           setFollowingCount(followingSnap.size);
 
-          // Check if current user is following this profileUser
           if (currentUser && currentUser.uid !== userId) {
             const currentUserFollowingRef = doc(db, 'users', currentUser.uid, 'following', userId);
             const followingDocSnap = await getDoc(currentUserFollowingRef);
@@ -139,18 +138,17 @@ export default function UserProfilePage() {
     const targetUserFollowersRef = doc(db, 'users', profileUser.uid, 'followers', currentUser.uid);
 
     try {
-      if (isFollowing) { // Unfollow
+      if (isFollowing) { 
         batch.delete(currentUserFollowingRef);
         batch.delete(targetUserFollowersRef);
         await batch.commit();
         setIsFollowing(false);
         setFollowersCount(prev => typeof prev === 'number' ? prev - 1 : 0);
         toast({ title: `Unfollowed ${profileUser.displayName}` });
-      } else { // Follow
-        batch.set(currentUserFollowingRef, { displayName: profileUser.displayName, photoURL: profileUser.photoURL || null, followedAt: serverTimestamp() });
-        batch.set(targetUserFollowersRef, { displayName: currentUser.displayName, photoURL: currentUser.photoURL || null, followerAt: serverTimestamp() });
+      } else { 
+        batch.set(currentUserFollowingRef, { displayName: profileUser.displayName, username: profileUser.username, photoURL: profileUser.photoURL || null, followedAt: serverTimestamp() });
+        batch.set(targetUserFollowersRef, { displayName: currentUser.displayName, username: currentUser.username, photoURL: currentUser.photoURL || null, followerAt: serverTimestamp() });
 
-        // Create notification for the followed user
         const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
             userId: profileUser.uid,
             category: 'social',
@@ -164,8 +162,7 @@ export default function UserProfilePage() {
             icon: 'UserPlus',
         };
         const notificationsColRef = collection(db, 'userNotifications');
-        // Firestore will auto-generate an ID for the notification document
-        const newNotificationRef = doc(notificationsColRef); // Create a new doc reference
+        const newNotificationRef = doc(notificationsColRef); 
         batch.set(newNotificationRef, { ...notificationData, timestamp: serverTimestamp() });
 
         await batch.commit();
@@ -225,6 +222,11 @@ export default function UserProfilePage() {
             <AvatarFallback className="text-4xl rounded-2xl">{profileUser.displayName?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
           <h2 className="text-2xl font-headline font-bold text-primary">{profileUser.displayName}</h2>
+          {profileUser.username && (
+            <p className="text-sm text-muted-foreground flex items-center">
+              <AtSign className="h-3.5 w-3.5 mr-0.5" />{profileUser.username}
+            </p>
+          )}
           {profileUser.bio ? (
              <p className="text-sm text-muted-foreground mt-1 max-w-md whitespace-pre-line break-words">{profileUser.bio}</p>
           ) : (
@@ -263,7 +265,7 @@ export default function UserProfilePage() {
                   {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>)}
                   {loadingFollowStatus ? 'Checking...' : (followActionInProgress ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Following' : 'Follow'))}
                 </Button>
-                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" disabled> {/* Placeholder for Message */}
+                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" disabled> 
                     <MessageSquare className="mr-2 h-5 w-5"/> Message
                 </Button>
             </div>
@@ -316,7 +318,9 @@ export default function UserProfilePage() {
             ) : (
                 <p className="text-muted-foreground italic">This user hasn't added a bio yet.</p>
             )}
-            {/* Placeholder for more about info like join date, etc. */}
+            {profileUser.username && (
+                <p className="text-xs text-muted-foreground/70 pt-2">Username: @{profileUser.username}</p>
+            )}
             <p className="text-xs text-muted-foreground/70 pt-2">User ID: {profileUser.uid}</p>
           </div>
         </TabsContent>

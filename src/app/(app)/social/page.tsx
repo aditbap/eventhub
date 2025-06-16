@@ -8,7 +8,7 @@ import { ArrowLeft, Search, Users, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit, orderBy, startAt, endAt } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, startAt, endAt, or } from 'firebase/firestore';
 import type { PublicUserProfile } from '@/types';
 import { UserListItem } from '@/components/profile/UserListItem';
 import { motion } from 'framer-motion';
@@ -23,9 +23,10 @@ export default function SocialPage() {
 
   const handleSearch = async (event?: FormEvent<HTMLFormElement>) => {
     if (event) event.preventDefault();
-    if (!searchQuery.trim()) {
+    const trimmedQuery = searchQuery.trim();
+    if (!trimmedQuery) {
       setSearchResults([]);
-      setHasSearched(true); // Indicate that a search (for empty) was performed
+      setHasSearched(true);
       return;
     }
 
@@ -33,45 +34,71 @@ export default function SocialPage() {
     setHasSearched(true);
     try {
       const usersRef = collection(db, 'users');
-      // Basic case-sensitive prefix search
-      // For a more robust search, consider a dedicated search service or more complex data structuring.
-      const q = query(
+      const normalizedQuery = trimmedQuery.toLowerCase(); // For username search
+
+      // Query for display name (case-insensitive prefix - harder in Firestore directly without 3rd party)
+      // We'll do a "starts with" for display name, and exact match for lowercase username
+      const displayNameQuery = query(
         usersRef,
         orderBy('displayName'),
-        startAt(searchQuery.trim()),
-        endAt(searchQuery.trim() + '\uf8ff'),
-        limit(20) // Limit results for performance
+        startAt(trimmedQuery),
+        endAt(trimmedQuery + '\uf8ff'),
+        limit(10)
       );
 
-      const querySnapshot = await getDocs(q);
-      const users: PublicUserProfile[] = [];
-      querySnapshot.forEach((doc) => {
+      // Query for username (exact match, case-insensitive by searching lowercase)
+      const usernameQuery = query(
+        usersRef,
+        where('username', '==', normalizedQuery),
+        limit(10)
+      );
+      
+      const [displayNameSnap, usernameSnap] = await Promise.all([
+          getDocs(displayNameQuery),
+          getDocs(usernameQuery)
+      ]);
+
+      const usersMap = new Map<string, PublicUserProfile>();
+
+      displayNameSnap.forEach((doc) => {
         const data = doc.data();
-        // Exclude current user from search results
         if (doc.id !== currentUser?.uid) {
-          users.push({
+          usersMap.set(doc.id, {
             uid: doc.id,
             displayName: data.displayName || 'User',
+            username: data.username || null,
             photoURL: data.photoURL || undefined,
             bio: data.bio || undefined,
           });
         }
       });
-      setSearchResults(users);
+
+      usernameSnap.forEach((doc) => {
+        const data = doc.data();
+        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { // Avoid duplicates
+          usersMap.set(doc.id, {
+            uid: doc.id,
+            displayName: data.displayName || 'User',
+            username: data.username || null,
+            photoURL: data.photoURL || undefined,
+            bio: data.bio || undefined,
+          });
+        }
+      });
+
+      setSearchResults(Array.from(usersMap.values()));
+
     } catch (error) {
       console.error("Error searching users:", error);
       setSearchResults([]);
-      // Optionally, show a toast message for search errors
     } finally {
       setIsLoadingSearch(false);
     }
   };
   
-  // Effect to clear results if search query becomes empty after a search
   useEffect(() => {
     if (searchQuery.trim() === '' && hasSearched && !isLoadingSearch) {
         setSearchResults([]);
-        // Optionally setHasSearched(false) if you want the initial prompt to reappear
     }
   }, [searchQuery, hasSearched, isLoadingSearch]);
 
@@ -98,12 +125,12 @@ export default function SocialPage() {
         <form onSubmit={handleSearch} className="flex items-center space-x-2 mb-6">
           <Input
             type="search"
-            placeholder="Search for people..."
+            placeholder="Search by name or @username..."
             className="flex-grow h-11 border-primary focus-visible:ring-primary"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (e.target.value.trim() === '') { // Auto-clear results if input is cleared
+              if (e.target.value.trim() === '') { 
                 setSearchResults([]);
                 setHasSearched(false);
               }
@@ -135,7 +162,7 @@ export default function SocialPage() {
             <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" strokeWidth={1.5}/>
             <p className="text-xl font-semibold text-muted-foreground">No users found</p>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-              Try a different name or check your spelling.
+              Try a different name or username, or check your spelling.
             </p>
           </div>
         ) : (
@@ -143,7 +170,7 @@ export default function SocialPage() {
                 <Users className="h-16 w-16 mx-auto text-primary/30 mb-4" strokeWidth={1.5}/>
                 <p className="text-xl font-semibold text-muted-foreground">Find People</p>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                Search by name to connect with others on UPJ Event Hub.
+                Search by name or @username to connect with others.
                 </p>
           </div>
         )}

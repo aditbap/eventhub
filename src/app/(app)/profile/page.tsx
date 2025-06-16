@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Ticket, Event, PublicUserProfile } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus } from 'lucide-react';
+import { Loader2, Ticket as TicketIconLucide, ArrowLeft, Pencil, ChevronRight, CalendarDays, Bookmark, PlusCircle, Edit3, Users, UserPlus, AtSign } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -85,8 +85,8 @@ export default function ProfilePage() {
   const [ticketsCount, setTicketsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
   const [myEventsCount, setMyEventsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
   const [savedEventsCount, setSavedEventsCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
-  const [currentUserBio, setCurrentUserBio] = useState<string | null>(null);
-  const [loadingBio, setLoadingBio] = useState(true);
+  const [currentUserData, setCurrentUserData] = useState<PublicUserProfile | null>(null);
+  const [loadingUserData, setLoadingUserData] = useState(true);
   const [isChangeBioDialogOpen, setIsChangeBioDialogOpen] = useState(false);
 
   const [followingCount, setFollowingCount] = useState<number | React.ReactNode>(<Loader2 className="h-4 w-4 animate-spin" />);
@@ -98,7 +98,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
-      setLoadingBio(true);
+      setLoadingUserData(true);
       setLoadingFollowCounts(true);
       setTicketsCount(<Loader2 className="h-4 w-4 animate-spin" />);
       setMyEventsCount(<Loader2 className="h-4 w-4 animate-spin" />);
@@ -112,7 +112,7 @@ export default function ProfilePage() {
           setTicketsCount(querySnapshot.docs.length);
         } catch (error: any) {
           console.error('Error fetching tickets for count:', error);
-          setTicketsCount(0); // Set to 0 on error
+          setTicketsCount(0); 
         }
       };
       fetchTicketsCount();
@@ -127,7 +127,7 @@ export default function ProfilePage() {
       const unsubscribeEventStore = eventStore.subscribe(fetchEventCountsFromStore);
       fetchEventCountsFromStore();
 
-      const fetchUserBioAndFollows = async () => {
+      const fetchUserSpecificData = async () => {
         try {
           const userDocRef = doc(db, "users", user.uid);
           const followersColRef = collection(db, 'users', user.uid, 'followers');
@@ -140,31 +140,38 @@ export default function ProfilePage() {
           ]);
 
           if (docSnap.exists()) {
-            setCurrentUserBio(docSnap.data()?.bio || null);
+            const data = docSnap.data();
+            setCurrentUserData({
+              uid: user.uid,
+              displayName: user.displayName, // From auth context, could also use data.displayName
+              photoURL: user.photoURL, // From auth context
+              bio: data?.bio || null,
+              username: data?.username || null,
+            });
           } else {
-            setCurrentUserBio(null);
+            setCurrentUserData({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL }); // Basic info
           }
           setFollowersCount(followersSnap.size);
           setFollowingCount(followingSnap.size);
 
         } catch (error) {
           console.error("Error fetching user data/follows:", error);
-          setCurrentUserBio(null);
+          setCurrentUserData({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL });
           setFollowersCount(0);
           setFollowingCount(0);
         } finally {
-          setLoadingBio(false);
+          setLoadingUserData(false);
           setLoadingFollowCounts(false);
         }
       };
-      fetchUserBioAndFollows();
+      fetchUserSpecificData();
 
       return () => {
         unsubscribeEventStore();
       };
 
     } else if (!authLoading) {
-      setLoadingBio(false);
+      setLoadingUserData(false);
       setLoadingFollowCounts(false);
       setTicketsCount(0);
       setMyEventsCount(0);
@@ -178,7 +185,7 @@ export default function ProfilePage() {
     if (!user) return;
     const result = await updateUserBio(newBio);
     if (result.success) {
-      setCurrentUserBio(newBio);
+      setCurrentUserData(prev => prev ? { ...prev, bio: newBio } : null);
       toast({
         title: "Bio Updated",
         description: "Your bio has been successfully updated.",
@@ -193,14 +200,19 @@ export default function ProfilePage() {
     }
   };
 
-  if (authLoading || !user) {
+  if (authLoading || (!user && !currentUserData)) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
+  if (!user || !currentUserData) { // Fallback if user is null after loading
+     router.replace('/login');
+     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  }
+
   const isLoadingCounts = typeof ticketsCount !== 'number' || 
                            typeof myEventsCount !== 'number' || 
                            typeof savedEventsCount !== 'number' ||
-                           loadingFollowCounts;
+                           loadingFollowCounts || loadingUserData;
 
 
   return (
@@ -222,8 +234,8 @@ export default function ProfilePage() {
         <div className="flex flex-col items-center justify-center text-center">
           <div className="relative mb-2">
             <Avatar className="h-28 w-28 border-4 border-white shadow-lg rounded-2xl">
-              <AvatarImage src={user.photoURL || `https://placehold.co/120x120.png?text=${user.displayName?.charAt(0)}`} alt={user.displayName || 'User'} data-ai-hint="profile avatar" className="rounded-2xl" />
-              <AvatarFallback className="text-4xl rounded-2xl">{user.displayName?.charAt(0) || 'U'}</AvatarFallback>
+              <AvatarImage src={currentUserData.photoURL || `https://placehold.co/120x120.png?text=${currentUserData.displayName?.charAt(0)}`} alt={currentUserData.displayName || 'User'} data-ai-hint="profile avatar" className="rounded-2xl" />
+              <AvatarFallback className="text-4xl rounded-2xl">{currentUserData.displayName?.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
             <Button
               variant="default"
@@ -235,13 +247,21 @@ export default function ProfilePage() {
               <Pencil className="h-4 w-4" />
             </Button>
           </div>
-          <h2 className="text-2xl font-headline font-semibold text-foreground mt-2">{user.displayName || 'User Name'}</h2>
+          <h2 className="text-2xl font-headline font-semibold text-foreground mt-2">{currentUserData.displayName || 'User Name'}</h2>
+          {loadingUserData ? (
+             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
+          ) : currentUserData.username && (
+            <p className="text-sm text-muted-foreground flex items-center">
+              <AtSign className="h-3.5 w-3.5 mr-0.5" />
+              {currentUserData.username}
+            </p>
+          )}
 
-          {loadingBio ? (
+          {loadingUserData ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
-          ) : currentUserBio ? (
+          ) : currentUserData.bio ? (
             <div className="mt-1 text-sm text-muted-foreground text-center max-w-md px-4">
-              <p className="whitespace-pre-line break-words">{currentUserBio}</p>
+              <p className="whitespace-pre-line break-words">{currentUserData.bio}</p>
               <Button
                 variant="link"
                 className="text-xs text-primary hover:underline p-0 h-auto mt-0.5"
@@ -270,19 +290,19 @@ export default function ProfilePage() {
 
           <div className="flex justify-around items-center w-full max-w-sm mt-6 py-3 bg-card/50 rounded-xl shadow-sm">
              <StatItem
-              value={loadingFollowCounts || typeof myEventsCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
+              value={isLoadingCounts || typeof myEventsCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
               label="My Events"
               href="/profile/my-events"
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
-              value={loadingFollowCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
+              value={isLoadingCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
               label="Following"
               href="/profile/following"
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
-              value={loadingFollowCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
+              value={isLoadingCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
               label="Followers"
               href="/profile/followers"
             />
@@ -316,7 +336,7 @@ export default function ProfilePage() {
       <ChangeBioDialog
         isOpen={isChangeBioDialogOpen}
         onClose={() => setIsChangeBioDialogOpen(false)}
-        currentBio={currentUserBio}
+        currentBio={currentUserData.bio}
         onSave={handleSaveBio}
       />
     </motion.div>

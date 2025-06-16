@@ -16,12 +16,16 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Loader2, User, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, AtSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { UpjLogo } from '@/components/icons/UpjLogo';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
+  username: z.string()
+    .min(3, { message: 'Username must be at least 3 characters.' })
+    .max(20, { message: 'Username must be no more than 20 characters.' })
+    .regex(/^[a-z0-9_]+$/, { message: 'Username can only contain lowercase letters, numbers, and underscores.' }),
   email: z.string().email({ message: 'Invalid email address.' }), 
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   confirmPassword: z.string().min(6, { message: 'Password must be at least 6 characters.' })
@@ -57,6 +61,7 @@ export function RegisterForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
+      username: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -65,17 +70,11 @@ export function RegisterForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setError(null);
-    const result = await register(values.name, values.email, values.password);
+    const result = await register(values.name, values.email, values.password, values.username);
 
     if (!result.success) {
       const err = result.error;
-      if (err.code === 'auth/email-already-in-use') {
-        setError("Email already in use.");
-      } else if (err.code === 'auth/invalid-email') { 
-        setError("Invalid email address format.");
-      } else {
-        setError(err.message || 'Failed to register. Please try again.');
-      }
+      setError(err.message || 'Failed to register. Please try again.');
       console.warn("Registration attempt failed (handled in form): Code:", err.code, "Message:", err.message);
     }
     // If successful, AuthContext handles navigation.
@@ -143,6 +142,26 @@ export function RegisterForm() {
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input placeholder="Full name" {...field} className="pl-10" />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <div className="relative">
+                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Username (e.g., john_doe)" 
+                      {...field} 
+                      className="pl-10"
+                      onChange={(e) => field.onChange(e.target.value.toLowerCase())} // Force lowercase input
+                    />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -261,5 +280,3 @@ export function RegisterForm() {
     </div>
   );
 }
-
-    

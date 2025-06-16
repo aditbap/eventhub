@@ -2,20 +2,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { PublicUserProfile } from '@/types'; // Assuming PublicUserProfile exists or will be created
+import type { PublicUserProfile } from '@/types'; 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { UserPlus, UserCheck, Loader2 } from 'lucide-react';
+import { UserPlus, UserCheck, Loader2, AtSign } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, writeBatch, serverTimestamp, collection } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Notification } from '@/types';
+import { cn } from '@/lib/utils';
 
 interface UserListItemProps {
   profileUser: PublicUserProfile;
-  currentUserUid?: string | null; // UID of the currently logged-in user
+  currentUserUid?: string | null; 
   onFollowStateChange?: (targetUserId: string, isNowFollowing: boolean) => void;
   showFollowButton?: boolean;
 }
@@ -26,7 +27,7 @@ export function UserListItem({
   onFollowStateChange,
   showFollowButton = true 
 }: UserListItemProps) {
-  const { user: authUser } = useAuth(); // authUser might be different from currentUserUid if viewing someone else's list
+  const { user: authUser } = useAuth(); 
   const [isFollowing, setIsFollowing] = useState(false);
   const [loadingFollowState, setLoadingFollowState] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(false);
@@ -53,7 +54,7 @@ export function UserListItem({
   }, [currentUserUid, profileUser.uid, showFollowButton]);
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent navigation if item is wrapped in Link
+    e.stopPropagation(); 
     e.preventDefault();
 
     if (!currentUserUid || !authUser || currentUserUid === profileUser.uid || !showFollowButton) return;
@@ -64,20 +65,29 @@ export function UserListItem({
     const targetUserFollowersRef = doc(db, 'users', profileUser.uid, 'followers', currentUserUid);
 
     try {
-      if (isFollowing) { // Unfollow
+      if (isFollowing) { 
         batch.delete(currentUserFollowingRef);
         batch.delete(targetUserFollowersRef);
         await batch.commit();
         setIsFollowing(false);
         toast({ title: `Unfollowed ${profileUser.displayName}` });
         if (onFollowStateChange) onFollowStateChange(profileUser.uid, false);
-      } else { // Follow
-        batch.set(currentUserFollowingRef, { displayName: profileUser.displayName, photoURL: profileUser.photoURL || null, followedAt: serverTimestamp() });
-        batch.set(targetUserFollowersRef, { displayName: authUser.displayName, photoURL: authUser.photoURL || null, followerAt: serverTimestamp() });
+      } else { 
+        batch.set(currentUserFollowingRef, { 
+            displayName: profileUser.displayName, 
+            username: profileUser.username || null, 
+            photoURL: profileUser.photoURL || null, 
+            followedAt: serverTimestamp() 
+        });
+        batch.set(targetUserFollowersRef, { 
+            displayName: authUser.displayName, 
+            username: authUser.username || null, 
+            photoURL: authUser.photoURL || null, 
+            followerAt: serverTimestamp() 
+        });
         
-        // Create notification for the followed user
         const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
-            userId: profileUser.uid, // Notification for the user being followed
+            userId: profileUser.uid, 
             category: 'social',
             title: `${authUser.displayName || 'Someone'} started following you`,
             message: `You have a new follower! Check out their profile.`,
@@ -89,9 +99,8 @@ export function UserListItem({
             icon: 'UserPlus',
         };
         const notificationsColRef = collection(db, 'userNotifications');
-        const newNotificationRef = doc(notificationsColRef); // Create a new doc reference
+        const newNotificationRef = doc(notificationsColRef); 
         batch.set(newNotificationRef, { ...notificationData, timestamp: serverTimestamp() });
-
 
         await batch.commit();
         setIsFollowing(true);
@@ -108,7 +117,6 @@ export function UserListItem({
   
   const avatarSrc = profileUser.photoURL || `https://placehold.co/40x40.png?text=${profileUser.displayName?.charAt(0) || 'P'}`;
 
-
   return (
     <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm hover:bg-muted/50 transition-colors">
       <Link href={`/users/${profileUser.uid}`} className="flex items-center space-x-3 flex-grow min-w-0">
@@ -118,7 +126,14 @@ export function UserListItem({
         </Avatar>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">{profileUser.displayName || 'User'}</p>
-          {profileUser.bio && <p className="text-xs text-muted-foreground truncate">{profileUser.bio}</p>}
+          {profileUser.username && (
+            <p className="text-xs text-muted-foreground flex items-center truncate">
+              <AtSign className="h-3 w-3 mr-0.5"/>{profileUser.username}
+            </p>
+          )}
+          {!profileUser.username && profileUser.bio && ( // Show bio if no username but bio exists
+             <p className="text-xs text-muted-foreground truncate">{profileUser.bio}</p>
+          )}
         </div>
       </Link>
       {showFollowButton && currentUserUid && currentUserUid !== profileUser.uid && (
