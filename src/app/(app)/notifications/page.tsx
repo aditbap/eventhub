@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { differenceInCalendarDays, isToday, isTomorrow, format } from 'date-fns';
-import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle as they are not used
+import { Card, CardContent } from '@/components/ui/card';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
@@ -152,10 +152,15 @@ export default function NotificationPage() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!user || notifications.filter(n => !n.isRead).length === 0) return;
+    if (!user) return;
     
     const unreadNotifications = notifications.filter(n => !n.isRead);
-    if (unreadNotifications.length === 0) return;
+    if (unreadNotifications.length === 0) {
+        toast({
+            description: "No unread notifications to mark.",
+        });
+        return;
+    }
 
     try {
       const batch = writeBatch(db);
@@ -200,7 +205,9 @@ export default function NotificationPage() {
             <DropdownMenuItem onClick={handleMarkAllAsRead} disabled={!hasUnreadNotifications}>
               Mark all as read
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>Notification settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/settings/notifications')}>
+              Notification settings
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
