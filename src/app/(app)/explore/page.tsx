@@ -22,6 +22,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { eventStore } from '@/lib/eventStore';
+import { UpjLogo } from '@/components/icons/UpjLogo'; // Added import
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState(''); // Used for input value and redirect query
@@ -115,8 +116,9 @@ export default function ExplorePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-40">
         <div className="container mx-auto flex items-center justify-between h-14">
-          {/* Menu button removed */}
-          <div className="w-9 h-9"></div> {/* Spacer to keep layout balanced if needed */}
+          <Link href="/explore" aria-label="Go to Explore page">
+            <UpjLogo iconOnly className="h-8 w-auto" fill="hsl(var(--primary-foreground))" />
+          </Link>
           <div className="text-center">
             <p className="text-xs opacity-80">Current Location</p>
             {loadingLocation ? (
