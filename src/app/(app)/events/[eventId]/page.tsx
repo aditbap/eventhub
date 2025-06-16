@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShareSheet } from '@/components/sharing/ShareSheet'; // Import ShareSheet
+import { ShareSheet } from '@/components/sharing/ShareSheet'; 
 
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
@@ -46,7 +46,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const [isGettingTicket, setIsGettingTicket] = useState(false);
   const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false);
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
-  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); // State for ShareSheet
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); 
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -180,10 +180,12 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleViewOrganizerProfile = () => {
-    if (event?.creatorId) { 
+    if (event?.creatorId && isRealCreator) { 
+        router.push(`/users/${event.creatorId}`);
+    } else if (event?.creatorId) {
         toast({
-            title: "Feature Coming Soon!",
-            description: "Viewing organizer profiles will be available in a future update.",
+            title: "Profile Unavailable",
+            description: "Organizer profile information is currently not fully available.",
         });
     }
   };
@@ -192,7 +194,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     if (isRealCreator && creator) {
         toast({
             title: "Feature Coming Soon!",
-            description: `The ability to follow ${creator.displayName} will be available soon.`,
+            description: `Following ${creator.displayName} will be implemented soon.`,
         });
     } else if (event?.creatorId) {
          toast({
@@ -203,7 +205,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleInviteFriends = () => {
-    setIsShareSheetOpen(true); // Open the share sheet
+    setIsShareSheetOpen(true); 
   };
 
 
@@ -272,7 +274,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             
              <div className="mt-4 p-3 bg-card rounded-lg shadow-sm border">
               <div className="flex items-center justify-between">
-                <div> {/* Left side for attendees or placeholder */}
+                <div> 
                   {event.attendees && event.attendees.length > 0 && typeof event.attendanceCount === 'number' ? (
                     <div className="flex items-center">
                       <div className="flex -space-x-2 mr-3">
@@ -292,7 +294,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                     </div>
                   )}
                 </div>
-                {/* Right side for Invite button, always visible */}
                 <Button variant="default" size="sm" onClick={handleInviteFriends} className="bg-primary/10 text-primary hover:bg-primary/20">
                   <Share2 className="mr-2 h-4 w-4" />
                   Invite
@@ -328,8 +329,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                 <div className="flex items-center justify-between">
                   <button
                     onClick={handleViewOrganizerProfile}
-                    className="flex items-center space-x-3 group hover:opacity-80 transition-opacity"
-                    disabled={!event?.creatorId}
+                    className="flex items-center space-x-3 group hover:opacity-80 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={!event?.creatorId || !isRealCreator}
                     aria-label={isRealCreator && creator?.displayName ? `View profile of ${creator.displayName}` : 'View organizer profile'}
                   >
                     <Avatar className="h-10 w-10">
@@ -338,7 +339,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                     </Avatar>
                     <div>
                       <p className="text-xs text-muted-foreground">Organized by</p>
-                      <p className="font-medium text-foreground group-hover:underline">{creator.displayName || 'Organizer'}</p>
+                      <p className={cn("font-medium text-foreground", isRealCreator && "group-hover:underline")}>{creator.displayName || 'Organizer'}</p>
                     </div>
                   </button>
                   {user && event?.creatorId && user.uid !== event.creatorId && (
@@ -418,3 +419,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
+
