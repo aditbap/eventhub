@@ -24,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 
 interface ImminentEvent {
@@ -34,7 +35,7 @@ interface ImminentEvent {
   location: string;
   imageUrl?: string;
   imageHint?: string;
-  relativeTime: string; 
+  relativeTime: string;
 }
 
 export default function NotificationPage() {
@@ -58,8 +59,8 @@ export default function NotificationPage() {
       try {
         const notifsRef = collection(db, 'userNotifications');
         const q = query(
-          notifsRef, 
-          where('userId', '==', user.uid), 
+          notifsRef,
+          where('userId', '==', user.uid),
           orderBy('timestamp', 'desc')
         );
         const querySnapshot = await getDocs(q);
@@ -87,32 +88,32 @@ export default function NotificationPage() {
         const ticketsQuery = query(ticketsRef, where('userId', '==', user.uid));
         const ticketsSnapshot = await getDocs(ticketsQuery);
         const userTickets: UserTicket[] = ticketsSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as UserTicket));
-        
+
         const today = new Date();
         today.setHours(0,0,0,0);
 
         const upcomingReminders: ImminentEvent[] = userTickets
           .map(ticket => {
-            const eventDate = new Date(ticket.eventDate); 
-            if (isNaN(eventDate.getTime())) return null; 
-            
+            const eventDate = new Date(ticket.eventDate);
+            if (isNaN(eventDate.getTime())) return null;
+
             const daysUntil = differenceInCalendarDays(eventDate, today);
             let relativeTime = '';
 
-            if (daysUntil < 0) return null; 
+            if (daysUntil < 0) return null;
 
             if (isToday(eventDate)) {
               relativeTime = 'Today';
             } else if (isTomorrow(eventDate)) {
               relativeTime = 'Tomorrow';
-            } else if (daysUntil <= 7) { 
+            } else if (daysUntil <= 7) {
               relativeTime = `In ${daysUntil} day${daysUntil > 1 ? 's' : ''} (${format(eventDate, 'EEE, MMM d')})`;
             } else {
-              return null; 
+              return null;
             }
-            
+
             return {
-              id: ticket.eventId, 
+              id: ticket.eventId,
               title: ticket.eventName,
               date: ticket.eventDate,
               time: ticket.eventTime,
@@ -123,9 +124,9 @@ export default function NotificationPage() {
             };
           })
           .filter(Boolean) as ImminentEvent[];
-        
+
         upcomingReminders.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setImminentEvents(upcomingReminders.slice(0, 3)); 
+        setImminentEvents(upcomingReminders.slice(0, 3));
 
       } catch (error) {
         console.error("Error fetching ticket reminders:", error);
@@ -142,7 +143,7 @@ export default function NotificationPage() {
     try {
       const notifRef = doc(db, 'userNotifications', notificationId);
       await updateDoc(notifRef, { isRead: true });
-      setNotifications(prev => 
+      setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
       );
     } catch (error) {
@@ -153,7 +154,7 @@ export default function NotificationPage() {
 
   const handleMarkAllAsRead = async () => {
     if (!user) return;
-    
+
     const unreadNotifications = notifications.filter(n => !n.isRead);
     if (unreadNotifications.length === 0) {
         toast({
@@ -170,8 +171,8 @@ export default function NotificationPage() {
       });
       await batch.commit();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      toast({ 
-        title: "All Read!", 
+      toast({
+        title: "All Read!",
         description: "All notifications have been marked as read.",
         action: <CheckCheck className="h-5 w-5 text-green-500" />,
       });
@@ -189,7 +190,12 @@ export default function NotificationPage() {
   const hasUnreadNotifications = notifications.some(n => !n.isRead);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="flex flex-col min-h-screen bg-background"
+    >
       <header className="sticky top-0 z-30 flex items-center justify-between px-2 sm:px-4 py-3 bg-background/80 backdrop-blur-md border-b w-full">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-muted/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
@@ -267,7 +273,7 @@ export default function NotificationPage() {
                 ))}
               </div>
             ) : (
-              imminentEvents.length === 0 && ( 
+              imminentEvents.length === 0 && (
                 <div className="flex flex-col items-center justify-center text-center py-10">
                   <BellOff className="h-24 w-24 text-primary/20 mb-6" strokeWidth={1.5} />
                   <p className="text-xl font-semibold text-primary mt-2 mb-2">
@@ -285,7 +291,6 @@ export default function NotificationPage() {
           </>
         )}
       </main>
-    </div>
+    </motion.div>
   );
 }
-
