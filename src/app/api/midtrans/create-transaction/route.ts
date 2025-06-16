@@ -14,7 +14,7 @@ if (MIDTRANS_SERVER_KEY && MIDTRANS_CLIENT_KEY && MIDTRANS_ENVIRONMENT) {
   snap = new Midtrans.Snap({
     isProduction: MIDTRANS_ENVIRONMENT === 'production',
     serverKey: MIDTRANS_SERVER_KEY,
-    clientKey: MIDTRANS_CLIENT_KEY, // midtrans-client also needs clientKey
+    clientKey: MIDTRANS_CLIENT_KEY,
   });
 } else {
   console.warn(
@@ -24,26 +24,55 @@ if (MIDTRANS_SERVER_KEY && MIDTRANS_CLIENT_KEY && MIDTRANS_ENVIRONMENT) {
   );
 }
 
+interface CreateTransactionBody {
+  eventId: string;
+  eventTitle: string;
+  eventPrice: number;
+  eventDate: string; // YYYY-MM-DD
+  eventTime?: string; // HH:MM
+  eventLocation: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  userPhone?: string;
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { eventId, eventTitle, eventPrice, userId, userEmail, userName, userPhone } = body;
+    const body: CreateTransactionBody = await request.json();
+    const { 
+      eventId, 
+      eventTitle, 
+      eventPrice, 
+      eventDate,
+      eventTime,
+      eventLocation,
+      userId, 
+      userEmail, 
+      userName, 
+      userPhone 
+    } = body;
 
-    if (!eventId || !eventTitle || !eventPrice || !userId || !userEmail || !userName) {
+    if (!eventId || !eventTitle || eventPrice === undefined || !eventDate || !eventLocation || !userId || !userEmail || !userName) {
       return NextResponse.json({ error: 'Missing required transaction details' }, { status: 400 });
     }
     
     if (!snap) {
       console.log("[API STUB / CREATE-TRANSACTION] Midtrans server not configured. Returning dummy SnapToken for UI testing.");
       const dummyOrderId = `DUMMY-ORDER-${eventId.slice(0,5)}-${userId.slice(0,5)}-${Date.now()}`;
-      // Important: The dummy token should be a plausible string, not just any random text,
-      // as Snap.js might have some basic format validation.
-      // A real token is typically a UUID-like string.
       const dummySnapToken = `dummy-snap-token-${dummyOrderId}`; 
       return NextResponse.json({ snapToken: dummySnapToken });
     }
 
     const orderId = `UPJEH-${eventId.slice(0,5)}-${userId.slice(0,5)}-${Date.now()}`;
+
+    const customField1Data = {
+      eventId: eventId,
+      userId: userId,
+      eventDate: eventDate,
+      eventTime: eventTime || null, // Ensure time is passed or null
+      eventLocation: eventLocation,
+    };
 
     const parameter = {
       transaction_details: {
@@ -51,7 +80,7 @@ export async function POST(request: Request) {
         gross_amount: eventPrice,
       },
       item_details: [{
-        id: eventId,
+        id: eventId, // Usually the product ID
         price: eventPrice,
         quantity: 1,
         name: eventTitle,
@@ -62,19 +91,10 @@ export async function POST(request: Request) {
         email: userEmail,
         phone: userPhone || undefined, 
       },
-      // Optional: Add custom fields if needed for backend processing or reconciliation
-      custom_field1: JSON.stringify({ eventId: eventId, userId: userId }), // Example: storing eventId and userId
-      // custom_field2: "Additional data",
-      // custom_field3: "More data",
+      custom_field1: JSON.stringify(customField1Data),
       callbacks: {
-        // finish: 'YOUR_APP_FINISH_REDIRECT_URL' // Redirect URL after payment (optional)
+        // finish: 'YOUR_APP_FINISH_REDIRECT_URL' // e.g., https://upjevent.vercel.app/profile/my-tickets
       },
-      expiry: {
-        // Optional: set transaction expiry
-        // start_time: new Date().toISOString().replace("T", " ").substring(0, 19) + " +0700",
-        // unit: "minutes",
-        // duration: 60 // e.g., transaction expires in 60 minutes
-      }
     };
 
     const transaction = await snap.createTransaction(parameter);
@@ -90,5 +110,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message || 'Failed to create Midtrans transaction' }, { status: 500 });
   }
 }
-
     

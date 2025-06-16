@@ -4,8 +4,8 @@
 import { NextResponse } from 'next/server';
 import Midtrans from 'midtrans-client';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import type { Ticket, Notification, Event } from '@/types'; // Ensure Event type is imported
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import type { Ticket, Notification } from '@/types';
 
 // Midtrans Server Configuration
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
@@ -27,7 +27,7 @@ if (MIDTRANS_SERVER_KEY && MIDTRANS_ENVIRONMENT) {
 interface EventDetailsForTicket {
     id: string;
     title: string;
-    date: string; // ISO string or formatted string
+    date: string; 
     time?: string;
     location: string;
     imageUrl?: string;
@@ -35,9 +35,26 @@ interface EventDetailsForTicket {
     price?: number;
 }
 
-async function createTicketAndNotification(userId: string, eventDetails: EventDetailsForTicket, orderId: string) {
+// This function is now responsible for checking idempotency and creating ticket/notification
+export async function createTicketAndNotification(
+  userId: string, 
+  eventDetails: EventDetailsForTicket, 
+  midtransOrderId: string,
+  midtransTransactionId?: string // Optional, from Midtrans transaction status
+) {
     try {
-      const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = {
+      // Idempotency Check: See if a ticket for this midtransOrderId already exists
+      const ticketsRef = collection(db, "userTickets");
+      const q = query(ticketsRef, where("midtransOrderId", "==", midtransOrderId));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        console.log(`[Ticket Creation] Ticket for Midtrans Order ID ${midtransOrderId} already exists. Skipping creation.`);
+        // Optionally, return the existing ticket ID or a specific status
+        return { success: true, ticketId: querySnapshot.docs[0].id, alreadyExists: true };
+      }
+
+      const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> & { midtransOrderId: string; midtransTransactionId?: string } = {
         userId: userId,
         eventId: eventDetails.id,
         eventName: eventDetails.title,
@@ -46,14 +63,13 @@ async function createTicketAndNotification(userId: string, eventDetails: EventDe
         eventLocation: eventDetails.location,
         eventImageUrl: eventDetails.imageUrl || undefined,
         eventImageHint: eventDetails.imageHint || undefined,
+        midtransOrderId: midtransOrderId, // Store Midtrans order ID
+        midtransTransactionId: midtransTransactionId || undefined,
       };
 
-      // Note: For production, you might want to store the Midtrans transaction_id or order_id with the ticket
-      // for reconciliation purposes.
       const ticketDocRef = await addDoc(collection(db, "userTickets"), {
         ...ticketData,
         purchaseDate: serverTimestamp(),
-        midtransOrderId: orderId, // Store Midtrans order ID
       });
 
       const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
@@ -75,9 +91,10 @@ async function createTicketAndNotification(userId: string, eventDetails: EventDe
         timestamp: serverTimestamp()
       });
 
-      return { success: true, ticketId: ticketDocRef.id };
+      console.log(`[Ticket Creation] Successfully created ticket ${ticketDocRef.id} for Midtrans Order ID ${midtransOrderId}`);
+      return { success: true, ticketId: ticketDocRef.id, alreadyExists: false };
     } catch (error) {
-      console.error('Error creating ticket/notification in Firestore:', error);
+      console.error(`[Ticket Creation] Error creating ticket/notification in Firestore for Midtrans Order ID ${midtransOrderId}:`, error);
       throw new Error('Failed to finalize ticket creation in database.');
     }
 }
@@ -95,14 +112,11 @@ export async function POST(request: Request) {
     // Handle free tickets directly without Midtrans verification if indicated
     if (clientTransactionStatus === 'free_ticket' && eventDetails.price === 0) {
         console.log(`[Verify API] Processing free ticket for order_id: ${order_id}`);
-        await createTicketAndNotification(userId, eventDetails, order_id);
+        await createTicketAndNotification(userId, eventDetails, order_id); // Pass order_id as midtransOrderId for consistency
         return NextResponse.json({ success: true, message: 'Free ticket acquired successfully!' });
     }
     
-    // Proceed with Midtrans verification for paid tickets
     if (!snap) {
-      // This case should ideally not be hit if create-transaction worked,
-      // but as a safeguard for paid tickets:
       console.error("[Verify API] Midtrans server not configured. Cannot verify paid transaction.");
       return NextResponse.json({ success: false, error: 'Payment gateway not configured on server.' }, { status: 500 });
     }
@@ -112,38 +126,29 @@ export async function POST(request: Request) {
     
     console.log('[Verify API] Midtrans Raw Status Response:', transactionStatus);
 
-    const { transaction_status, fraud_status } = transactionStatus;
+    const { transaction_status, fraud_status, transaction_id } = transactionStatus;
 
-    // Check if payment is successful according to Midtrans
-    // (settlement for most, capture if you use pre-auth/capture)
     if (
         (transaction_status === 'capture' && fraud_status === 'accept') ||
-        (transaction_status === 'settlement') // Settlement implies fraud check passed
+        (transaction_status === 'settlement')
     ) {
       console.log(`[Verify API] Payment confirmed for order_id: ${order_id}. Status: ${transaction_status}`);
-      // Payment is successful, proceed to create ticket and notification
-      await createTicketAndNotification(userId, eventDetails, order_id);
+      await createTicketAndNotification(userId, eventDetails, order_id, transaction_id);
       return NextResponse.json({ success: true, message: 'Ticket acquired successfully after payment verification!' });
 
     } else if (transaction_status === 'pending') {
         console.log(`[Verify API] Payment pending for order_id: ${order_id}. Status: ${transaction_status}`);
-        // Handle pending: inform user, rely on webhook for final status
         return NextResponse.json({ success: false, error: 'Payment is still pending. We will notify you upon confirmation.', status: 'pending' }, { status: 202 });
     } else {
-      // Payment failed or other status
       console.warn(`[Verify API] Payment not successful for order_id: ${order_id}. Midtrans status: ${transaction_status}, Fraud status: ${fraud_status}`);
-      return NextResponse.json({ success: false, error: `Payment not confirmed or failed. Status: ${transaction_status}` }, { status: 402 }); // Payment Required or Bad Request
+      return NextResponse.json({ success: false, error: `Payment not confirmed or failed. Status: ${transaction_status}` }, { status: 402 });
     }
 
   } catch (error: any) {
     console.error('[Verify API] Error during payment verification:', error);
-    // Check if this is error from Midtrans API itself
     if (error.ApiResponse && error.ApiResponse.error_messages) {
         return NextResponse.json({ success: false, error: 'Midtrans API Error during verification.', details: error.ApiResponse.error_messages }, { status: 500 });
     }
     return NextResponse.json({ success: false, error: error.message || 'Failed to verify payment or create ticket.' }, { status: 500 });
   }
 }
-
-
-    
