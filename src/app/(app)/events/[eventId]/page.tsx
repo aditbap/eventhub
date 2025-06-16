@@ -6,7 +6,7 @@ import type { Event, Ticket, Notification } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -111,7 +111,6 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         purchaseDate: serverTimestamp() 
       });
 
-      // Create a notification for successful ticket acquisition
       const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
         userId: user.uid,
         category: 'event_registration',
@@ -201,6 +200,13 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     }
   };
 
+  const handleInviteFriends = () => {
+    toast({
+      title: 'Invite Friends',
+      description: 'Sharing and invite functionality will be available soon!',
+    });
+  };
+
 
   if (loadingEvent) {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -264,6 +270,25 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-2">About this event</h2>
               <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{event.description}</p>
             </div>
+             {event.attendanceCount !== undefined && event.attendees && event.attendees.length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-card rounded-lg shadow-sm border">
+                    <div className="flex items-center">
+                        <div className="flex -space-x-2 mr-3">
+                            {event.attendees.slice(0, 3).map((attendee, index) => (
+                                <Avatar key={attendee.id || index} className="h-8 w-8 border-2 border-background">
+                                    <AvatarImage src={attendee.avatarUrl} alt={attendee.name} data-ai-hint="attendee avatar"/>
+                                    <AvatarFallback>{attendee.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                            ))}
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{event.attendanceCount} people attending</span>
+                    </div>
+                    <Button variant="default" size="sm" onClick={handleInviteFriends} className="bg-primary/10 text-primary hover:bg-primary/20">
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Invite
+                    </Button>
+                </div>
+            )}
           </div>
           
           <div className="space-y-4 rounded-xl border bg-card p-4 shadow-lg md:sticky md:top-20">
@@ -282,15 +307,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                 {event.venue && <p className="text-sm text-muted-foreground">{event.venue}</p>}
               </div>
             </div>
-            {event.attendanceCount !== undefined && event.attendees && event.attendees.length > 0 && (
-              <div className="flex items-start space-x-3">
-                <Users className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
-                <div>
-                   <p className="font-medium text-foreground">{event.attendanceCount} attending</p>
-                </div>
-              </div>
-            )}
-
+            
             {loadingCreator ? (
               <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -383,3 +400,4 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
+
