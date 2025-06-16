@@ -149,6 +149,9 @@ export default function ProfilePage() {
               username: data?.username || null,
             });
           } else {
+            // If user doc doesn't exist, still set current user data with defaults
+            // This can happen for a new user before their Firestore doc is fully created
+            // or if there was an issue creating it.
             setCurrentUserData({ 
               uid: user.uid, 
               displayName: user.displayName, 
@@ -162,6 +165,7 @@ export default function ProfilePage() {
 
         } catch (error) {
           console.error("Error fetching user data/follows:", error);
+          // On error, set a default structure for currentUserData to avoid issues
           setCurrentUserData({ 
             uid: user.uid, 
             displayName: user.displayName, 
@@ -183,8 +187,10 @@ export default function ProfilePage() {
       };
 
     } else if (!authLoading) {
+      // If not authenticated and auth is not loading, clear user-specific data
       setLoadingUserData(false);
       setLoadingFollowCounts(false);
+      setCurrentUserData(null); // Explicitly set to null
       setTicketsCount(0);
       setMyEventsCount(0);
       setSavedEventsCount(0);
@@ -212,12 +218,22 @@ export default function ProfilePage() {
     }
   };
 
-  if (authLoading || (!user && !currentUserData)) {
+  // Effect for handling redirection if user is not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user, router]);
+
+
+  if (authLoading || (!user && !currentUserData)) { // Show loader if auth is loading OR if user is not available and no currentUserData (initial state)
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
+  // If, after loading, there's still no user or no currentUserData, it means redirection should have happened.
+  // This check is more of a safeguard; the useEffect above handles the redirect.
   if (!user || !currentUserData) { 
-     router.replace('/login');
+     // The useEffect above should handle this, but as a fallback:
      return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 
