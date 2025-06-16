@@ -37,13 +37,13 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageUrl: 'https://placehold.co/1200x600.png',
     imageHint: 'music festival concert',
     attendanceCount: 1250,
-    price: 50,
+    price: 750000, // Was 50
     attendees: [
       { id: 'a1', avatarUrl: 'https://placehold.co/32x32.png?text=U1', name: 'User One' },
       { id: 'a2', avatarUrl: 'https://placehold.co/32x32.png?text=U2', name: 'User Two' },
       { id: 'a3', avatarUrl: 'https://placehold.co/32x32.png?text=U3', name: 'User Three' },
     ],
-    isBookmarked: false, // Changed to false
+    isBookmarked: false,
   },
   {
     id: '2',
@@ -62,7 +62,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
       { id: 'b1', avatarUrl: 'https://placehold.co/32x32.png?text=S1', name: 'Student Alpha' },
       { id: 'b2', avatarUrl: 'https://placehold.co/32x32.png?text=S2', name: 'Student Beta' },
     ],
-    isBookmarked: false, // Changed to false
+    isBookmarked: false,
   },
   {
     id: '3',
@@ -76,8 +76,8 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageUrl: 'https://placehold.co/1200x600.png',
     imageHint: 'charity run marathon',
     attendanceCount: 530,
-    price: 10,
-    isBookmarked: false, // Changed to false
+    price: 150000, // Was 10
+    isBookmarked: false,
   },
    {
     id: '4',
@@ -90,14 +90,14 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageUrl: 'https://placehold.co/1200x600.png',
     imageHint: 'tech conference summit',
     attendanceCount: 450,
-    price: 75,
+    price: 1125000, // Was 75
     attendees: [
       { id: 'c1', avatarUrl: 'https://placehold.co/32x32.png?text=T1', name: 'Techie A' },
       { id: 'c2', avatarUrl: 'https://placehold.co/32x32.png?text=T2', name: 'Techie B' },
       { id: 'c3', avatarUrl: 'https://placehold.co/32x32.png?text=T3', name: 'Techie C' },
       { id: 'c4', avatarUrl: 'https://placehold.co/32x32.png?text=T4', name: 'Techie D' },
     ],
-    isBookmarked: false, // Changed to false
+    isBookmarked: false,
   },
   {
     id: '5',
@@ -111,7 +111,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'open mic cafe',
     attendanceCount: 95,
     price: 0,
-    isBookmarked: false, // Changed to false
+    isBookmarked: false,
   },
   {
     id: '6',
@@ -124,9 +124,9 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageUrl: 'https://placehold.co/1200x600.png',
     imageHint: 'basketball tournament sport',
     attendanceCount: 600,
-    price: 5,
+    price: 75000, // Was 5
     attendees: [ ],
-    isBookmarked: false, // Changed to false
+    isBookmarked: false,
   },
   // --- NEW DUMMY EVENTS FOR UPCOMING/NEAR YOU ---
   {
@@ -156,8 +156,8 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'digital art tablet',
     attendanceCount: 0, // No attendees yet
     attendees: [],
-    price: 15,
-    isBookmarked: false, // Changed to false
+    price: 225000, // Was 15
+    isBookmarked: false,
   },
   {
     id: 'event-nearyou-upcoming-3',
@@ -186,7 +186,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'jazz band cafe',
     attendanceCount: 0, // No attendees, will show in upcoming
     attendees: [],
-    price: 10,
+    price: 150000, // Was 10
     isBookmarked: false,
   },
   {
@@ -201,7 +201,7 @@ const MOCK_EVENTS_INITIAL: Event[] = [
     imageHint: 'history old building',
     attendanceCount: 0,
     attendees: [],
-    price: 5,
+    price: 75000, // Was 5
     isBookmarked: false,
   }
 ];
@@ -224,8 +224,8 @@ export const eventStore = {
         const numericId = parseInt(event.id.replace(/\D/g, ''), 10); // Extract numbers from ID
         return numericId > max ? numericId : max;
     }, 0);
-    
-    if (!newEvent.id.includes('-')) { 
+
+    if (!newEvent.id.includes('-')) {
         const newNumericId = (parseInt(newEvent.id, 10) > maxId) ? newEvent.id : (maxId + 1).toString();
         newEvent.id = newNumericId;
     }
@@ -247,4 +247,3 @@ export const eventStore = {
     return () => subscribers.delete(callback); // Unsubscribe function
   },
 };
-

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MapPinIcon, Bookmark, CalendarDays, DollarSign } from 'lucide-react';
+import { MapPinIcon, Bookmark, CalendarDays, Banknote } from 'lucide-react'; // Changed DollarSign to Banknote
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { eventStore } from '@/lib/eventStore'; // Import eventStore
@@ -17,23 +17,20 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
-  // Removed local isBookmarked state, will use event.isBookmarked directly from props
-
   const toggleBookmark = (e: React.MouseEvent) => {
-    e.preventDefault(); 
+    e.preventDefault();
     e.stopPropagation();
-    eventStore.toggleEventBookmark(event.id); // Call eventStore method
+    eventStore.toggleEventBookmark(event.id);
   };
-  
+
   const formatDate = (dateString: string, format: 'short' | 'overlay') => {
     const date = new Date(dateString);
     if (format === 'overlay') {
-      const day = date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'UTC' }); // Ensure UTC for date part consistency
+      const day = date.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'UTC' });
       const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
       return { day, month };
     }
-    // 'short' format: 1ST JUNE - SAT - 2:00 PM
-    const dayOfMonth = date.getUTCDate(); // Use UTC date parts
+    const dayOfMonth = date.getUTCDate();
     const suffix = (d: number) => {
       if (d > 3 && d < 21) return 'TH';
       switch (d % 10) {
@@ -45,7 +42,7 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
     };
     const month = date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
     const weekday = date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase();
-    
+
     let formattedTime = 'Time TBD';
     if (event.time) {
       const [hours, minutes] = event.time.split(':');
@@ -53,17 +50,16 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
       const m = parseInt(minutes, 10);
       if (!isNaN(h) && !isNaN(m)) {
         const tempDate = new Date(0);
-        tempDate.setUTCHours(h,m); // Assume event.time is in UTC for consistent display if it were actual UTC
-                                   // If event.time is local, this needs more timezone context
+        tempDate.setUTCHours(h,m);
         formattedTime = tempDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'UTC' }).replace(' ', '');
       } else {
-        formattedTime = event.time; // Fallback if time parsing fails
+        formattedTime = event.time;
       }
     }
     return `${dayOfMonth}${suffix(dayOfMonth)} ${month} - ${weekday}${event.time ? ` - ${formattedTime}` : ''}`;
   };
 
-  const priceDisplay = event.price === 0 ? 'Free' : event.price ? `$${event.price}` : 'N/A';
+  const priceDisplay = event.price === 0 ? 'Free' : event.price ? `Rp ${event.price.toLocaleString('id-ID')}` : 'N/A';
 
 
   if (variant === 'upcoming') {
@@ -84,10 +80,10 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
               <span className="block text-xl">{day}</span>
               <span className="block text-xs">{month}</span>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={toggleBookmark} 
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleBookmark}
               className="absolute top-3 right-3 h-9 w-9 bg-white/80 hover:bg-white rounded-lg shadow"
               aria-label={event.isBookmarked ? "Unbookmark event" : "Bookmark event"}
             >
@@ -117,7 +113,7 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
                 <span>{event.location}</span>
               </div>
               <div className="text-xs text-muted-foreground flex items-center">
-                <DollarSign className="h-3.5 w-3.5 mr-1 shrink-0 text-primary" />
+                <Banknote className="h-3.5 w-3.5 mr-1 shrink-0 text-primary" />
                 <span>{priceDisplay}</span>
               </div>
             </div>
@@ -149,14 +145,14 @@ export function EventCard({ event, variant = 'upcoming' }: EventCardProps) {
               <span className="truncate">{event.location}</span>
             </div>
             <div className="flex items-center text-xs text-muted-foreground">
-                <DollarSign className="h-3.5 w-3.5 mr-1 shrink-0" />
+                <Banknote className="h-3.5 w-3.5 mr-1 shrink-0" />
                 <span>{priceDisplay}</span>
               </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={toggleBookmark} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleBookmark}
             className="ml-2 h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-primary"
             aria-label={event.isBookmarked ? "Unbookmark event" : "Bookmark event"}
           >

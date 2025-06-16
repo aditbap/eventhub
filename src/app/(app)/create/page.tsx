@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, UploadCloud, DollarSign, MapPin, Building, Clock, FileText, Palette, ArrowLeft } from 'lucide-react';
+import { CalendarIcon, UploadCloud, Banknote, MapPin, Building, Clock, FileText, Palette, ArrowLeft } from 'lucide-react'; // Changed DollarSign to Banknote
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { eventStore } from '@/lib/eventStore';
@@ -102,8 +102,8 @@ export default function CreateEventPage() {
       price: data.price ?? 0,
       imageUrl: data.imageUrl,
       imageHint: data.imageHint,
-      attendees: [], 
-      attendanceCount: 0, 
+      attendees: [],
+      attendanceCount: 0,
       isBookmarked: false,
       creatorId: user.uid, // Add creatorId
     };
@@ -240,9 +240,9 @@ export default function CreateEventPage() {
 
             <div className="space-y-2">
               <Label htmlFor="price" className="flex items-center text-base font-semibold">
-                <DollarSign className="mr-2 h-5 w-5 text-primary opacity-70" /> Price <span className="text-xs text-muted-foreground ml-1">(0 for free)</span>
+                <Banknote className="mr-2 h-5 w-5 text-primary opacity-70" /> Price <span className="text-xs text-muted-foreground ml-1">(0 for free)</span>
               </Label>
-              <Input id="price" type="number" {...register('price')} placeholder="e.g., 10 or leave blank for free" step="0.01" min="0" className={cn(errors.price && "border-destructive")} />
+              <Input id="price" type="number" {...register('price')} placeholder="e.g., 150000 or leave blank for free" step="1" min="0" className={cn(errors.price && "border-destructive")} />
               {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
             </div>
           </div>

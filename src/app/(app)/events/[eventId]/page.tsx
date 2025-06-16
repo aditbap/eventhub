@@ -6,7 +6,7 @@ import type { Event, Ticket, Notification } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight, Banknote } from 'lucide-react'; // Added Banknote
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ShareSheet } from '@/components/sharing/ShareSheet'; 
+import { ShareSheet } from '@/components/sharing/ShareSheet';
 
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
@@ -46,7 +46,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const [isGettingTicket, setIsGettingTicket] = useState(false);
   const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false);
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
-  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); 
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -97,7 +97,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     if (!user || !event) return;
     setIsGettingTicket(true);
     try {
-      const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = { 
+      const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = {
         userId: user.uid,
         eventId: event.id,
         eventName: event.title,
@@ -107,10 +107,10 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         eventImageUrl: event.imageUrl || undefined,
         eventImageHint: event.imageHint || undefined,
       };
-      
+
       const ticketDocRef = await addDoc(collection(db, "userTickets"), {
         ...ticketData,
-        purchaseDate: serverTimestamp() 
+        purchaseDate: serverTimestamp()
       });
 
       const notificationData: Omit<Notification, 'id' | 'timestamp'> = {
@@ -180,7 +180,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleViewOrganizerProfile = () => {
-    if (event?.creatorId && isRealCreator) { 
+    if (event?.creatorId && isRealCreator) {
         router.push(`/users/${event.creatorId}`);
     } else if (event?.creatorId) {
         toast({
@@ -205,7 +205,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   };
 
   const handleInviteFriends = () => {
-    setIsShareSheetOpen(true); 
+    setIsShareSheetOpen(true);
   };
 
 
@@ -222,7 +222,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         </div>
     );
   }
-  
+
   const formattedDate = new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const formattedTime = event.time ? new Date(`1970-01-01T${event.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true}) : 'N/A';
 
@@ -230,26 +230,26 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const buttonText = () => {
     if (isCheckingExistingTicket) return "Checking...";
     if (isGettingTicket) return "Getting Ticket...";
-    return event.price && event.price > 0 ? `Get Ticket - $${event.price.toFixed(2)}` : 'Get Free Ticket';
+    return event.price && event.price > 0 ? `Get Ticket - Rp ${event.price.toLocaleString('id-ID')}` : 'Get Free Ticket';
   };
-  
+
   return (
     <div className="bg-background min-h-screen">
       <div className="relative h-[300px] sm:h-[400px] md:h-[500px] w-full">
-        <Image 
-            src={event.imageUrl} 
-            alt={event.title} 
+        <Image
+            src={event.imageUrl}
+            alt={event.title}
             fill
-            objectFit="cover" 
+            objectFit="cover"
             className="opacity-80"
             data-ai-hint={event.imageHint || "event hero"}
-            priority 
+            priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => router.back()} 
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => router.back()}
           className="absolute top-4 left-4 bg-black/30 hover:bg-black/50 text-white rounded-full z-10"
           aria-label="Go back"
         >
@@ -264,17 +264,17 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
       </div>
 
       <div className="container mx-auto max-w-3xl p-4 sm:p-6 space-y-6 md:space-y-8 pb-24">
-        
+
         <div className="grid md:grid-cols-3 gap-6 items-start">
           <div className="md:col-span-2 space-y-6">
             <div>
               <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-2">About this event</h2>
               <p className="text-foreground/80 leading-relaxed whitespace-pre-line">{event.description}</p>
             </div>
-            
+
              <div className="mt-4 p-3 bg-card rounded-lg shadow-sm border">
               <div className="flex items-center justify-between">
-                <div> 
+                <div>
                   {event.attendees && event.attendees.length > 0 && typeof event.attendanceCount === 'number' ? (
                     <div className="flex items-center">
                       <div className="flex -space-x-2 mr-3">
@@ -301,7 +301,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               </div>
             </div>
           </div>
-          
+
           <div className="space-y-4 rounded-xl border bg-card p-4 shadow-lg md:sticky md:top-20">
             <h3 className="text-lg font-headline font-semibold border-b pb-2 text-foreground">Event Details</h3>
             <div className="flex items-start space-x-3">
@@ -318,7 +318,26 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
                 {event.venue && <p className="text-sm text-muted-foreground">{event.venue}</p>}
               </div>
             </div>
-            
+             {event.price !== undefined && event.price > 0 && (
+              <div className="flex items-start space-x-3">
+                <Banknote className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+                <div>
+                  <p className="font-medium text-foreground">Rp {event.price.toLocaleString('id-ID')}</p>
+                  <p className="text-sm text-muted-foreground">Ticket Price</p>
+                </div>
+              </div>
+            )}
+            {event.price === 0 && (
+                 <div className="flex items-start space-x-3">
+                    <Banknote className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+                    <div>
+                        <p className="font-medium text-foreground">Free</p>
+                        <p className="text-sm text-muted-foreground">Ticket Price</p>
+                    </div>
+                </div>
+            )}
+
+
             {loadingCreator ? (
               <div className="flex items-center space-x-2 pt-3 mt-3 border-t">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -359,9 +378,9 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               </div>
             )}
 
-            <Button 
-              size="lg" 
-              className="w-full mt-4" 
+            <Button
+              size="lg"
+              className="w-full mt-4"
               onClick={handleGetTicket}
               disabled={buttonLoading || !user}
             >
@@ -371,7 +390,7 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             {!user && <p className="text-xs text-center text-muted-foreground mt-1">Please log in to get a ticket.</p>}
           </div>
         </div>
-        
+
         <div className="border-t pt-6 md:pt-8">
           <h2 className="text-xl sm:text-2xl font-headline font-semibold text-foreground mb-3">Location on Map</h2>
           <div className="bg-muted h-64 sm:h-80 md:h-96 rounded-lg shadow-inner overflow-hidden flex flex-col items-center justify-center text-center p-4">
@@ -419,4 +438,3 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
     </div>
   );
 }
-
