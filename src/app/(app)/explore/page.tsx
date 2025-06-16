@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { EventCard } from '@/components/events/EventCard';
 import { CategoryFilter } from '@/components/events/CategoryFilter';
-import { SearchIcon, SlidersHorizontal, Menu, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight, X } from 'lucide-react';
+import { SearchIcon, SlidersHorizontal, Bell, ChevronDown, MapPinIcon as LocationIcon, Loader2, ChevronRight, X } from 'lucide-react';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Link from 'next/link';
 import {
@@ -115,9 +115,8 @@ export default function ExplorePage() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-40">
         <div className="container mx-auto flex items-center justify-between h-14">
-          <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-white/20">
-            <Menu className="h-6 w-6" />
-          </Button>
+          {/* Menu button removed */}
+          <div className="w-9 h-9"></div> {/* Spacer to keep layout balanced if needed */}
           <div className="text-center">
             <p className="text-xs opacity-80">Current Location</p>
             {loadingLocation ? (
