@@ -12,13 +12,17 @@ export function UpjLogo(props: UpjLogoProps) {
   const isPrimaryColorEffectivelyWhite = () => {
     if (typeof primaryLogoColor !== 'string') return false;
     const lowerColor = primaryLogoColor.toLowerCase();
+    // Check for common white values AND the literal string for --primary-foreground
     return lowerColor === 'white' ||
            lowerColor === '#fff' ||
            lowerColor === '#ffffff' ||
            lowerColor === 'rgb(255,255,255)' ||
-           lowerColor === 'rgba(255,255,255,1)';
+           lowerColor === 'rgba(255,255,255,1)' ||
+           lowerColor === 'hsl(var(--primary-foreground))'; // Added this check
   };
 
+  // If the main logo color (primaryLogoColor) is white-ish, details should be the app's primary color.
+  // Otherwise (e.g., main logo color is green), details should be white.
   const detailShapesFill = isPrimaryColorEffectivelyWhite() ? 'hsl(var(--primary))' : 'white';
 
   if (iconOnly) {
