@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MoreVertical, BellOff, Loader2, CalendarClock, AlertTriangle, Ticket } from 'lucide-react';
+import { ArrowLeft, MoreVertical, BellOff, Loader2, CalendarClock, AlertTriangle, Ticket, CheckCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
@@ -15,12 +15,16 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Notification as NotificationType, Ticket as UserTicket } from '@/types';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, Timestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
-import { NotificationListItem } from '@/components/notifications/NotificationListItem'; // New component
+import { NotificationListItem } from '@/components/notifications/NotificationListItem';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { differenceInCalendarDays, isToday, isTomorrow, format } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Removed CardHeader, CardTitle as they are not used
+import Image from 'next/image';
+import { cn } from '@/lib/utils';
+import { ChevronRight } from 'lucide-react';
+
 
 interface ImminentEvent {
   id: string;
@@ -30,7 +34,7 @@ interface ImminentEvent {
   location: string;
   imageUrl?: string;
   imageHint?: string;
-  relativeTime: string; // e.g., "Today", "Tomorrow", "In X days"
+  relativeTime: string; 
 }
 
 export default function NotificationPage() {
@@ -49,7 +53,6 @@ export default function NotificationPage() {
       return;
     }
 
-    // Fetch stored notifications
     const fetchNotifications = async () => {
       setLoadingNotifications(true);
       try {
@@ -77,7 +80,6 @@ export default function NotificationPage() {
       }
     };
 
-    // Fetch user's tickets to derive imminent event reminders
     const fetchImminentEventReminders = async () => {
       setLoadingReminders(true);
       try {
@@ -91,26 +93,26 @@ export default function NotificationPage() {
 
         const upcomingReminders: ImminentEvent[] = userTickets
           .map(ticket => {
-            const eventDate = new Date(ticket.eventDate); // Assumes YYYY-MM-DD
-            if (isNaN(eventDate.getTime())) return null; // Invalid date
+            const eventDate = new Date(ticket.eventDate); 
+            if (isNaN(eventDate.getTime())) return null; 
             
             const daysUntil = differenceInCalendarDays(eventDate, today);
             let relativeTime = '';
 
-            if (daysUntil < 0) return null; // Event is in the past
+            if (daysUntil < 0) return null; 
 
             if (isToday(eventDate)) {
               relativeTime = 'Today';
             } else if (isTomorrow(eventDate)) {
               relativeTime = 'Tomorrow';
-            } else if (daysUntil <= 7) { // Within a week
+            } else if (daysUntil <= 7) { 
               relativeTime = `In ${daysUntil} day${daysUntil > 1 ? 's' : ''} (${format(eventDate, 'EEE, MMM d')})`;
             } else {
-              return null; // Only show reminders for events within 7 days
+              return null; 
             }
             
             return {
-              id: ticket.eventId, // Use eventId for linking
+              id: ticket.eventId, 
               title: ticket.eventName,
               date: ticket.eventDate,
               time: ticket.eventTime,
@@ -122,9 +124,8 @@ export default function NotificationPage() {
           })
           .filter(Boolean) as ImminentEvent[];
         
-        // Sort by how soon they are
         upcomingReminders.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        setImminentEvents(upcomingReminders.slice(0, 3)); // Show max 3 reminders
+        setImminentEvents(upcomingReminders.slice(0, 3)); 
 
       } catch (error) {
         console.error("Error fetching ticket reminders:", error);
@@ -152,17 +153,23 @@ export default function NotificationPage() {
 
   const handleMarkAllAsRead = async () => {
     if (!user || notifications.filter(n => !n.isRead).length === 0) return;
+    
+    const unreadNotifications = notifications.filter(n => !n.isRead);
+    if (unreadNotifications.length === 0) return;
+
     try {
       const batch = writeBatch(db);
-      notifications.forEach(n => {
-        if (!n.isRead) {
-          const notifRef = doc(db, 'userNotifications', n.id);
-          batch.update(notifRef, { isRead: true });
-        }
+      unreadNotifications.forEach(n => {
+        const notifRef = doc(db, 'userNotifications', n.id);
+        batch.update(notifRef, { isRead: true });
       });
       await batch.commit();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      toast({ title: "Success", description: "All notifications marked as read." });
+      toast({ 
+        title: "All Read!", 
+        description: "All notifications have been marked as read.",
+        action: <CheckCheck className="h-5 w-5 text-green-500" />,
+      });
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({ title: "Error", description: "Could not mark all as read.", variant: "destructive" });
@@ -174,6 +181,7 @@ export default function NotificationPage() {
   }
 
   const isLoading = loadingNotifications || loadingReminders;
+  const hasUnreadNotifications = notifications.some(n => !n.isRead);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -189,7 +197,7 @@ export default function NotificationPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleMarkAllAsRead} disabled={notifications.filter(n => !n.isRead).length === 0}>
+            <DropdownMenuItem onClick={handleMarkAllAsRead} disabled={!hasUnreadNotifications}>
               Mark all as read
             </DropdownMenuItem>
             <DropdownMenuItem disabled>Notification settings</DropdownMenuItem>
@@ -213,7 +221,7 @@ export default function NotificationPage() {
                 <div className="space-y-3">
                   {imminentEvents.map(event => (
                     <Link key={event.id} href={`/events/${event.id}`} passHref className="block">
-                      <Card className="hover:shadow-md transition-colors bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/50">
+                      <Card className="hover:shadow-md transition-shadow bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/50">
                         <CardContent className="p-3 flex items-center space-x-3">
                            {event.imageUrl ? (
                               <Image
@@ -252,7 +260,7 @@ export default function NotificationPage() {
                 ))}
               </div>
             ) : (
-              imminentEvents.length === 0 && ( // Only show if no reminders either
+              imminentEvents.length === 0 && ( 
                 <div className="flex flex-col items-center justify-center text-center py-10">
                   <BellOff className="h-24 w-24 text-primary/20 mb-6" strokeWidth={1.5} />
                   <p className="text-xl font-semibold text-primary mt-2 mb-2">
@@ -273,3 +281,4 @@ export default function NotificationPage() {
     </div>
   );
 }
+
