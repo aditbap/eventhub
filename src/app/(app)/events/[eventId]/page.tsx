@@ -6,7 +6,7 @@ import type { Event, Ticket, Notification } from '@/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight, Banknote } from 'lucide-react'; // Added Banknote
+import { CalendarDays, MapPin, Users, Ticket as TicketIconLucide, Loader2, ArrowLeft, AlertTriangle, UserCircle, Wrench, UserPlus, Share2, ChevronRight, Banknote } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -27,6 +27,27 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ShareSheet } from '@/components/sharing/ShareSheet';
 
+// Midtrans Snap.js TypeScript declaration
+declare global {
+  interface Window {
+    snap?: {
+      pay: (
+        snapToken: string,
+        options?: {
+          onSuccess?: (result: any) => void;
+          onPending?: (result: any) => void;
+          onError?: (result: any) => void;
+          onClose?: () => void;
+          embedId?: string;
+          redirectUrl?: string; // For scenarios where redirect is preferred
+        }
+      ) => void;
+      // You can add other Snap methods here if you use them, e.g., snap.embed()
+    };
+  }
+}
+
+
 const categoryColors: { [key in Event['category']]: string } = {
   Music: 'bg-category-music text-white',
   Food: 'bg-category-food text-white',
@@ -43,13 +64,57 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [creator, setCreator] = useState<{ displayName: string; photoURL?: string | null } | null>(null);
   const [loadingCreator, setLoadingCreator] = useState(false);
-  const [isGettingTicket, setIsGettingTicket] = useState(false);
-  const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false);
+  
+  const [actionInProgress, setActionInProgress] = useState(false); // Combined loading state
+  const [isCheckingExistingTicket, setIsCheckingExistingTicket] = useState(false); // Specific for pre-check
+  
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+
+  // Load Midtrans Snap.js script
+  useEffect(() => {
+    // These should be set in your .env.local or environment variables
+    const midtransSnapScriptUrl = process.env.NEXT_PUBLIC_MIDTRANS_SNAP_SCRIPT_URL || 'https://app.sandbox.midtrans.com/snap/snap.js'; // Default to sandbox
+    const midtransClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY;
+
+    if (!midtransClientKey) {
+      console.warn('Midtrans Client Key (NEXT_PUBLIC_MIDTRANS_CLIENT_KEY) is not configured. Payment functionality will be affected.');
+      // Optionally, disable payment buttons or show a message to the user
+      return;
+    }
+
+    const scriptId = 'midtrans-snap-sdk';
+    if (document.getElementById(scriptId)) {
+      // console.log('Midtrans Snap.js already loaded.');
+      return; // Script already loaded
+    }
+    
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = midtransSnapScriptUrl;
+    script.setAttribute('data-client-key', midtransClientKey);
+    script.async = true;
+
+    script.onload = () => {
+      // console.log('Midtrans Snap.js loaded successfully.');
+    };
+    script.onerror = () => {
+        console.error('Failed to load Midtrans Snap.js script.');
+    };
+
+    document.head.appendChild(script);
+
+    return () => {
+      const existingScript = document.getElementById(scriptId);
+      if (existingScript) {
+        document.head.removeChild(existingScript);
+      }
+    };
+  }, []);
+
 
   useEffect(() => {
     setLoadingEvent(true);
@@ -92,10 +157,11 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const isRealCreator = creator && event?.creatorId &&
                        !['Unknown Creator', 'Error loading organizer', 'Organizer N/A'].includes(creator.displayName);
 
-
-  const proceedToGetTicket = async () => {
+  // This function now only creates the ticket and notification in Firestore.
+  // It's called after successful payment for paid events, or directly for free events.
+  const finalizeTicketAcquisition = async () => {
     if (!user || !event) return;
-    setIsGettingTicket(true);
+    setActionInProgress(true); // Use general loading state
     try {
       const ticketData: Omit<Ticket, 'id' | 'qrCodeUrl' | 'purchaseDate'> = {
         userId: user.uid,
@@ -142,20 +208,133 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
         ),
       });
     } catch (error) {
-      console.error('Error getting ticket or creating notification:', error);
+      console.error('Error finalizing ticket or creating notification:', error);
       toast({
         title: 'Error',
-        description: 'Could not get your ticket or send notification. Please try again.',
+        description: 'Could not finalize your ticket or send notification. Please try again.',
         variant: 'destructive',
       });
     } finally {
-      setIsGettingTicket(false);
+      setActionInProgress(false);
     }
   };
 
+  const initiateMidtransPayment = async () => {
+    if (!user || !event || !(event.price && event.price > 0)) return;
+
+    setActionInProgress(true);
+    try {
+      const response = await fetch('/api/midtrans/create-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          eventTitle: event.title,
+          eventPrice: event.price,
+          userId: user.uid,
+          userEmail: user.email,
+          userName: user.displayName,
+          // userPhone: '08123...' // Optional: Collect user phone if needed by Midtrans/your setup
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to create Midtrans transaction (${response.status})`);
+      }
+
+      const { snapToken } = await response.json();
+
+      if (!snapToken) {
+        throw new Error('Snap token not received from server.');
+      }
+
+      if (!window.snap) {
+        throw new Error('Midtrans Snap.js is not loaded.');
+      }
+      
+      window.snap.pay(snapToken, {
+        onSuccess: (result: any) => {
+          console.log('Midtrans Payment Success:', result);
+          toast({
+            title: 'Payment Successful!',
+            description: 'Your payment was processed successfully. Finalizing ticket...',
+          });
+          // IMPORTANT: In a real app, verify the transaction with your backend here
+          // before calling finalizeTicketAcquisition.
+          // For this example, we proceed directly.
+          finalizeTicketAcquisition(); 
+        },
+        onPending: (result: any) => {
+          console.log('Midtrans Payment Pending:', result);
+          toast({
+            title: 'Payment Pending',
+            description: 'Your payment is pending. We will update you once it is confirmed.',
+          });
+          setActionInProgress(false);
+        },
+        onError: (result: any) => {
+          console.error('Midtrans Payment Error:', result);
+          toast({
+            title: 'Payment Failed',
+            description: result.message || 'There was an error processing your payment. Please try again.',
+            variant: 'destructive',
+          });
+          setActionInProgress(false);
+        },
+        onClose: () => {
+          // Only set loading to false if it wasn't successful or pending.
+          // onSuccess/onPending will manage their own loading states.
+          // This check helps prevent flicker if user closes immediately after success/pending.
+          if (actionInProgress) { // Check if still in a loading state not handled by other callbacks
+            toast({
+              description: 'Payment popup closed.',
+              variant: 'default',
+            });
+          }
+          setActionInProgress(false); // Ensure loading is false if closed before any result.
+        },
+      });
+      // setActionInProgress(false) is handled by Midtrans callbacks after this point.
+
+    } catch (error: any) {
+      console.error('Error initiating Midtrans payment:', error);
+      toast({
+        title: 'Payment Initiation Error',
+        description: error.message || 'Could not start the payment process. Please try again.',
+        variant: 'destructive',
+      });
+      setActionInProgress(false);
+    }
+  };
+
+
   const handleGetTicket = async () => {
     if (!user || !event) return;
+    
+    // If it's a free event, check for existing ticket then proceed or finalize.
+    if (!event.price || event.price <= 0) {
+      setIsCheckingExistingTicket(true);
+      try {
+        const ticketsRef = collection(db, 'userTickets');
+        const q = query(ticketsRef, where('userId', '==', user.uid), where('eventId', '==', event.id));
+        const querySnapshot = await getDocs(q);
 
+        if (!querySnapshot.empty) {
+          setShowConfirmationDialog(true); // For free event, confirm getting another
+        } else {
+          await finalizeTicketAcquisition(); // Directly get free ticket
+        }
+      } catch (error) {
+        console.error('Error checking existing tickets for free event:', error);
+        toast({ title: 'Error', description: 'Could not verify tickets. Please try again.', variant: 'destructive' });
+      } finally {
+        setIsCheckingExistingTicket(false);
+      }
+      return;
+    }
+
+    // For paid events:
     setIsCheckingExistingTicket(true);
     try {
       const ticketsRef = collection(db, 'userTickets');
@@ -163,17 +342,13 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
-        setShowConfirmationDialog(true);
+        setShowConfirmationDialog(true); // Paid event, already has one, confirm for another (will trigger payment)
       } else {
-        await proceedToGetTicket();
+        await initiateMidtransPayment(); // Paid event, no existing ticket, initiate payment
       }
     } catch (error) {
-      console.error('Error checking existing tickets:', error);
-      toast({
-        title: 'Error',
-        description: 'Could not verify existing tickets. Please try again.',
-        variant: 'destructive',
-      });
+      console.error('Error checking existing tickets for paid event:', error);
+      toast({ title: 'Error', description: 'Could not verify existing tickets. Please try again.', variant: 'destructive' });
     } finally {
       setIsCheckingExistingTicket(false);
     }
@@ -226,10 +401,11 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
   const formattedDate = new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const formattedTime = event.time ? new Date(`1970-01-01T${event.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true}) : 'N/A';
 
-  const buttonLoading = isCheckingExistingTicket || isGettingTicket;
+  const buttonLoadingState = actionInProgress || isCheckingExistingTicket;
   const buttonText = () => {
     if (isCheckingExistingTicket) return "Checking...";
-    if (isGettingTicket) return "Getting Ticket...";
+    if (actionInProgress && event.price && event.price > 0) return "Processing Payment...";
+    if (actionInProgress && (!event.price || event.price <=0)) return "Getting Ticket...";
     return event.price && event.price > 0 ? `Get Ticket - Rp ${event.price.toLocaleString('id-ID')}` : 'Get Free Ticket';
   };
 
@@ -382,9 +558,9 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
               size="lg"
               className="w-full mt-4"
               onClick={handleGetTicket}
-              disabled={buttonLoading || !user}
+              disabled={buttonLoadingState || !user}
             >
-              {buttonLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TicketIconLucide className="mr-2 h-5 w-5" />}
+              {buttonLoadingState ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TicketIconLucide className="mr-2 h-5 w-5" />}
               {buttonText()}
             </Button>
             {!user && <p className="text-xs text-center text-muted-foreground mt-1">Please log in to get a ticket.</p>}
@@ -409,7 +585,8 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             </div>
             <AlertDialogTitle className="text-center">Already Have a Ticket?</AlertDialogTitle>
             <AlertDialogDescription className="text-center">
-              You already have a ticket for "{event?.title}". Would you like to get another one?
+              You already have a ticket for "{event?.title}". 
+              {event?.price && event.price > 0 ? " Would you like to purchase another one?" : " Would you like to get another one?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center">
@@ -417,7 +594,11 @@ export default function EventDetailsPage({ params: paramsPromise }: { params: Pr
             <AlertDialogAction
               onClick={async () => {
                 setShowConfirmationDialog(false);
-                await proceedToGetTicket();
+                if (event && event.price && event.price > 0) {
+                  await initiateMidtransPayment(); 
+                } else {
+                  await finalizeTicketAcquisition(); 
+                }
               }}
               className="bg-primary hover:bg-primary/90"
             >
