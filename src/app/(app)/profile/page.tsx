@@ -143,20 +143,32 @@ export default function ProfilePage() {
             const data = docSnap.data();
             setCurrentUserData({
               uid: user.uid,
-              displayName: user.displayName, // From auth context, could also use data.displayName
-              photoURL: user.photoURL, // From auth context
+              displayName: user.displayName, 
+              photoURL: user.photoURL, 
               bio: data?.bio || null,
               username: data?.username || null,
             });
           } else {
-            setCurrentUserData({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL }); // Basic info
+            setCurrentUserData({ 
+              uid: user.uid, 
+              displayName: user.displayName, 
+              photoURL: user.photoURL,
+              bio: null, 
+              username: null, 
+            });
           }
           setFollowersCount(followersSnap.size);
           setFollowingCount(followingSnap.size);
 
         } catch (error) {
           console.error("Error fetching user data/follows:", error);
-          setCurrentUserData({ uid: user.uid, displayName: user.displayName, photoURL: user.photoURL });
+          setCurrentUserData({ 
+            uid: user.uid, 
+            displayName: user.displayName, 
+            photoURL: user.photoURL,
+            bio: null, 
+            username: null, 
+          });
           setFollowersCount(0);
           setFollowingCount(0);
         } finally {
@@ -204,7 +216,7 @@ export default function ProfilePage() {
     return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
   
-  if (!user || !currentUserData) { // Fallback if user is null after loading
+  if (!user || !currentUserData) { 
      router.replace('/login');
      return <div className="flex justify-center items-center min-h-screen bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -292,19 +304,19 @@ export default function ProfilePage() {
              <StatItem
               value={isLoadingCounts || typeof myEventsCount !== 'number' ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : myEventsCount}
               label="My Events"
-              href="/profile/my-events"
+              href={`/profile/my-events?userId=${currentUserData.uid}&userName=${currentUserData.displayName || 'User'}`}
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
               value={isLoadingCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followingCount}
               label="Following"
-              href="/profile/following"
+              href={`/profile/following?userId=${currentUserData.uid}&userName=${currentUserData.displayName || 'User'}`}
             />
             <Separator orientation="vertical" className="h-8 bg-border/70" />
             <StatItem
               value={isLoadingCounts ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : followersCount}
               label="Followers"
-              href="/profile/followers"
+              href={`/profile/followers?userId=${currentUserData.uid}&userName=${currentUserData.displayName || 'User'}`}
             />
           </div>
         </div>
