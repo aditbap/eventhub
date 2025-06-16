@@ -117,7 +117,7 @@ export default function ExplorePage() {
       <header className="bg-primary text-primary-foreground p-4 sticky top-0 z-40">
         <div className="container mx-auto flex items-center justify-between h-14">
           <Link href="/explore" aria-label="Go to Explore page">
-            <UpjLogo iconOnly className="h-8 w-auto" fill="hsl(var(--primary-foreground))" />
+            <UpjLogo iconOnly={false} className="h-8 w-auto" fill="hsl(var(--primary-foreground))" />
           </Link>
           <div className="text-center">
             <p className="text-xs opacity-80">Current Location</p>
