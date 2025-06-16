@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react'; // Removed Wrench
+import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -14,23 +14,18 @@ interface NavItem {
   isDisabled?: boolean;
 }
 
-// Order adjusted to place Create in the middle for odd numbers of primary tabs
 const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
-  { href: '/social', label: 'Social', icon: Users, isDisabled: true },
+  { href: '/social', label: 'Social', icon: Users, isDisabled: false }, // Enabled Social Tab
   { href: '/profile', label: 'Profile', icon: UserCircle },
-  // { href: '/map', label: 'Map', icon: Wrench, isDisabled: true }, // Map tab removed
 ];
 
 
 export function BottomNavigationBar() {
   const pathname = usePathname();
-
-  // Filter out the Map item for mobile view if it makes the bar too crowded
-  // This filter is now redundant as Map is removed from navItems, but kept for clarity if other items are conditionally removed later.
-  const mobileNavItems = navItems.filter(item => item.label !== 'Map');
+  const mobileNavItems = navItems;
 
 
   return (
@@ -62,7 +57,7 @@ export function BottomNavigationBar() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5', // Adjusted w-1/5 for 5 items
+                'flex flex-col items-center justify-center w-1/5 text-muted-foreground hover:text-primary transition-colors pt-1 pb-0.5',
                 isActive && !item.isDisabled && 'text-primary',
                 item.isDisabled && 'opacity-50 cursor-not-allowed hover:text-muted-foreground'
               )}

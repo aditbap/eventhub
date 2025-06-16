@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react'; // Removed Wrench
+import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -17,8 +17,7 @@ const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus },
-  { href: '/social', label: 'Social', icon: Users, isDisabled: true },
-  // { href: '/map', label: 'Map', icon: Wrench, isDisabled: true }, // Removed Map tab
+  { href: '/social', label: 'Social', icon: Users, isDisabled: false }, // Enabled Social Tab
   { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
