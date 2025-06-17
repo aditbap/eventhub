@@ -3,7 +3,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import type { Event, Notification, PublicUserProfile } from '@/types';
@@ -46,6 +45,10 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
   return <div className={cn("text-center", className)}>{content}</div>;
 };
 
+// Helper function to generate a consistent chat ID
+const getChatId = (uid1: string, uid2: string): string => {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+};
 
 export default function UserProfilePage() {
   const params = useParams();
@@ -83,7 +86,7 @@ export default function UserProfilePage() {
           setProfileUser({
             uid: userDocSnap.id,
             displayName: data.displayName || 'User',
-            username: data.username || null, // Added username
+            username: data.username || null, 
             photoURL: data.photoURL || undefined,
             bio: data.bio || undefined,
           });
@@ -178,6 +181,15 @@ export default function UserProfilePage() {
     }
   };
   
+  const handleMessage = () => {
+    if (!currentUser || !profileUser || currentUser.uid === profileUser.uid) {
+      if (!currentUser) toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
+      return;
+    }
+    const chatId = getChatId(currentUser.uid, profileUser.uid);
+    router.push(`/messages/${chatId}`);
+  };
+
   const isCurrentUserProfile = useMemo(() => currentUser?.uid === userId, [currentUser, userId]);
 
   if (loadingProfile || currentUserLoading) {
@@ -265,7 +277,7 @@ export default function UserProfilePage() {
                   {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>)}
                   {loadingFollowStatus ? 'Checking...' : (followActionInProgress ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Following' : 'Follow'))}
                 </Button>
-                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" disabled> 
+                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" onClick={handleMessage}> 
                     <MessageSquare className="mr-2 h-5 w-5"/> Message
                 </Button>
             </div>
