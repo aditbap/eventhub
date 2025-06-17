@@ -1,0 +1,95 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection
+    match /users/{userId} {
+      // Allow anyone to read public user profiles
+      allow read: if true;
+
+      // Only the authenticated owner can create or update their own profile
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+
+      // Generally, users shouldn't delete their own account directly from client
+      // This operation is often handled by a backend function for cleanup
+      allow delete: if false;
+
+      // Followers subcollection (users who follow {userId})
+      match /followers/{followerDocId} { // followerDocId is usually the UID of the user who is following {userId}
+        // Allow anyone to read the list of followers
+        allow read: if true;
+        // An authenticated user can add/remove themselves as a follower to another user.
+        // followerDocId (the ID of this document) must be the authenticated user's UID.
+        // {userId} (the user being followed) must not be the authenticated user.
+        allow write: if request.auth != null && request.auth.uid == followerDocId && request.auth.uid != userId;
+      }
+
+      // Following subcollection (users {userId} is following)
+      match /following/{followedDocId} { // followedDocId is usually the UID of the user being followed by {userId}
+        // Allow anyone to read the list of users someone is following
+        allow read: if true;
+        // An authenticated user can only manage their own 'following' list.
+        // {userId} (the owner of this 'following' list) must be the authenticated user's UID.
+        allow write: if request.auth != null && request.auth.uid == userId && request.auth.uid != followedDocId;
+      }
+    }
+
+    // Events collection
+    match /events/{eventId} {
+      // Allow anyone to read event details
+      allow read: if true;
+      // Allow authenticated users to create new events
+      allow create: if request.auth != null;
+      // Only the creator of the event can update or delete it
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.creatorId;
+    }
+
+    // UserTickets collection
+    match /userTickets/{ticketId} {
+      // Only the owner of the ticket can read their ticket
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Users can create tickets for themselves
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Only the owner can delete their ticket
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Updates might not be allowed or require specific logic
+      allow update: if false;
+    }
+
+    // UserNotifications collection
+    match /userNotifications/{notificationId} {
+      // Only the owner of the notification can read or update it (e.g., mark as read)
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Notification creation is usually handled by backend/cloud functions,
+      // or by the user if the notification results from a user action.
+      // Allowing authenticated users to create, but this might need to be tightened based on notification types.
+      allow create: if request.auth != null;
+      // Users might not be allowed to delete notifications directly.
+      allow delete: if false;
+    }
+
+    // Chats collection
+    match /chats/{chatId} {
+      // Allow read/write only if the authenticated user is one of the participants in the chat
+      allow read, update, delete: if request.auth != null && request.auth.uid in resource.data.participants;
+      // Allow create only if the authenticated user is one of the participants in the new chat document,
+      // and the participants array has exactly two members.
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.participants
+                      && request.resource.data.participants.size() == 2;
+
+      // Messages subcollection within a chat
+      match /messages/{messageId} {
+        // Allow read if the authenticated user is a participant in the parent chat document
+        allow read: if request.auth != null && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+        // Allow create if the authenticated user is the sender and is a participant in the parent chat
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.senderId
+                        && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+        // Generally, messages are not updated or deleted by users directly
+        allow update, delete: if false;
+      }
+    }
+  }
+}
+    
