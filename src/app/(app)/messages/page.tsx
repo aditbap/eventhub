@@ -101,16 +101,20 @@ export default function MessagesPage() {
   const { toast } = useToast(); 
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth state to resolve
+    if (authLoading) return; 
 
-    if (!currentUser || !currentUser.uid) { // Explicitly check for user and uid
+    if (!currentUser || !currentUser.uid) { 
       router.replace('/login');
       return;
     }
 
     setLoadingChats(true);
-    console.log(`[MessagesPage] Current user UID: ${currentUser.uid}. Setting up Firestore listener for chats.`);
+    console.log(`[MessagesPage] Current user UID for query: ${currentUser.uid}. Type: ${typeof currentUser.uid}`);
+    
     const chatsRef = collection(db, 'chats');
+    const queryParamsLog = `Querying 'chats' where 'participants' array-contains '${currentUser.uid}', orderBy 'updatedAt' DESC.`;
+    console.log(`[MessagesPage] ${queryParamsLog}`);
+
     const q = query(
       chatsRef,
       where('participants', 'array-contains', currentUser.uid),
@@ -128,12 +132,12 @@ export default function MessagesPage() {
     }, (error) => {
       console.error("[MessagesPage] Error fetching chats (onSnapshot):", error);
       if (error.code === 'permission-denied' || (error as any).code === 'failed-precondition') {
-        console.error("[MessagesPage] Firestore permission error or missing index. Please check your Firestore rules and ensure the necessary composite index exists for 'chats' collection (participants array-contains ASC, updatedAt DESC).");
+        console.error("[MessagesPage] Firestore permission error or missing index. Please check your Firestore rules and ensure the necessary composite index exists for 'chats' collection (participants array-contains, updatedAt DESC). Link to Firebase console for index creation might appear in browser console.");
         toast({
             title: "Error Loading Chats",
-            description: "Could not load your conversations. This might be a permission issue or a missing database index. Ensure Firestore index: `chats` (participants Array ASC, updatedAt Timestamp DESC) exists.",
+            description: "Could not load conversations. This is likely due to a missing database index or a permission issue. Please ensure Firestore index: `chats` (participants Array-CONTAINS, updatedAt Timestamp DESC) exists and is active.",
             variant: "destructive",
-            duration: 15000, 
+            duration: 20000, 
         });
       } else {
          toast({
@@ -226,3 +230,4 @@ export default function MessagesPage() {
   );
 }
 
+    
