@@ -42,7 +42,7 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
         </button>
     );
   }
-  return <div className={cn("text-center", className)}>{itemContent}</div>;
+  return <div className={cn("text-center", className)}>{content}</div>;
 };
 
 // Helper function to generate a consistent chat ID
@@ -188,12 +188,10 @@ export default function UserProfilePage() {
     }
 
     console.log("[handleMessage] Attempting to create/navigate to chat.");
-    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid})`);
-    console.log(`[handleMessage] Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
-    console.log("[handleMessage] Current User DisplayName:", currentUser.displayName);
-    console.log("[handleMessage] Profile User DisplayName:", profileUser.displayName);
-    console.log("[handleMessage] Current User Username:", currentUser.username);
-    console.log("[handleMessage] Profile User Username:", profileUser.username);
+    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid}), Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
+    console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username}`);
+    console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username}`);
+
 
     const chatId = getChatId(currentUser.uid, profileUser.uid);
     const chatDocRef = doc(db, 'chats', chatId);
@@ -236,6 +234,7 @@ export default function UserProfilePage() {
       }
       return value;
     }, 2));
+
 
     try {
         const chatDocSnap = await getDoc(chatDocRef);
