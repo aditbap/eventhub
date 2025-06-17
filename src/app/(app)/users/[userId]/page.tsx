@@ -188,7 +188,8 @@ export default function UserProfilePage() {
     }
 
     console.log("[handleMessage] Attempting to create/navigate to chat.");
-    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid}), Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
+    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid})`);
+    console.log(`[handleMessage] Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
     console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username}`);
     console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username}`);
 
@@ -212,7 +213,18 @@ export default function UserProfilePage() {
     const participantsArray = [currentUser.uid, profileUser.uid];
     console.log("[handleMessage] Participants array BEFORE sort:", participantsArray);
     const sortedParticipantsArray = [...participantsArray].sort();
-    console.log("[handleMessage] Participants array AFTER sort:", sortedParticipantsArray);
+    
+    // --- DETAILED LOGS FOR SECURITY RULE DEBUGGING ---
+    console.log("--- Firestore `allow create` rule for /chats/{chatId} ---");
+    console.log("Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;");
+    console.log("--- Comparing with data to be written ---");
+    console.log(`1. request.auth != null: ${currentUser ? 'true (user logged in)' : 'false (user not logged in)'}`);
+    console.log(`2. request.auth.uid: ${currentUser?.uid}`);
+    console.log(`   request.resource.data.participants (to be written):`, sortedParticipantsArray);
+    console.log(`   Is request.auth.uid in request.resource.data.participants? : ${currentUser ? sortedParticipantsArray.includes(currentUser.uid) : 'N/A (no auth user)'}`);
+    console.log(`3. request.resource.data.participants.size() (to be written): ${sortedParticipantsArray.length}`);
+    console.log("--- End of security rule comparison data ---");
+
 
     const chatDataToWrite = {
         participants: sortedParticipantsArray,
@@ -228,7 +240,7 @@ export default function UserProfilePage() {
         }
     };
     
-    console.log("[handleMessage] Data to write to Firestore for new chat (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
+    console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
       if (key === 'updatedAt' && value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
         return `ServerTimestampPlaceholder`;
       }
@@ -406,5 +418,4 @@ export default function UserProfilePage() {
     </motion.div>
   );
 }
-
     
