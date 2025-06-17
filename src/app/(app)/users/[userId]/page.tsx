@@ -7,11 +7,11 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import type { Event, Notification, PublicUserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, AtSign } from 'lucide-react';
+import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, AtSign, MessageSquare } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +46,12 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
 };
 
 
+// Helper function to generate a consistent chat ID
+const getChatId = (uid1: string, uid2: string): string => {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+};
+
+
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
@@ -70,14 +76,16 @@ export default function UserProfilePage() {
 
     const fetchUserProfileAndCounts = async () => {
       setLoadingProfile(true);
-      setLoadingFollowStatus(true);
+      setLoadingFollowStatus(true); // Reset loading follow status
       setFollowersCount(<Loader2 className="h-4 w-4 animate-spin" />);
       setFollowingCount(<Loader2 className="h-4 w-4 animate-spin" />);
       try {
+        console.log(`[UserProfilePage] Fetching profile for userId: ${userId}`);
         const userDocRef = doc(db, 'users', userId);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
+          console.log(`[UserProfilePage] Document found for userId: ${userId}`);
           const data = userDocSnap.data();
           setProfileUser({
             uid: userDocSnap.id,
@@ -106,16 +114,22 @@ export default function UserProfilePage() {
             setIsFollowing(followingDocSnap.exists());
           }
         } else {
+          console.warn(`[UserProfilePage] Document NOT found for userId: ${userId}`);
           setProfileUser(null);
           setFollowersCount(0);
           setFollowingCount(0);
         }
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
+      } catch (error: any) {
+        console.error(`Error fetching user profile for ${userId}:`, error);
         setProfileUser(null);
         setFollowersCount(0);
         setFollowingCount(0);
-        toast({ title: "Error", description: "Could not load user profile.", variant: "destructive" });
+        toast({
+            title: "Profile Load Error",
+            description: `Could not load profile for User ID: ${userId}. ${error.message ? `Details: ${error.message}` : 'Please try again.'}`,
+            variant: "destructive",
+            duration: 7000
+        });
       } finally {
         setLoadingProfile(false);
         setLoadingFollowStatus(false);
@@ -172,6 +186,126 @@ export default function UserProfilePage() {
     } catch (error) {
       console.error("Error toggling follow state:", error);
       toast({ title: "Error", description: "Could not update follow status.", variant: "destructive" });
+    } finally {
+      setFollowActionInProgress(false);
+    }
+  };
+
+  const handleMessage = async () => {
+    console.log("[handleMessage] Attempting to message user...");
+    if (!currentUser || !profileUser || currentUserLoading) {
+      console.warn("[handleMessage] Pre-condition failed: currentUser or profileUser is null, or auth is loading.");
+      if (!currentUser && !currentUserLoading) {
+          toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
+      } else if (!profileUser) {
+          toast({ title: "Error", description: "Target user profile is not available.", variant: "destructive" });
+      }
+      return;
+    }
+
+    if (currentUser.uid === profileUser.uid) {
+      console.log("[handleMessage] User tried to message themselves.");
+      toast({ description: "You cannot message yourself." });
+      return;
+    }
+    
+    if (!currentUser.uid || typeof currentUser.uid !== 'string' || currentUser.uid.trim() === '') {
+        console.error("[handleMessage] Critical: currentUser.uid is invalid:", currentUser.uid);
+        toast({ title: "Error", description: "Your user ID is invalid. Cannot start chat.", variant: "destructive" });
+        return;
+    }
+    if (!profileUser.uid || typeof profileUser.uid !== 'string' || profileUser.uid.trim() === '') {
+        console.error("[handleMessage] Critical: profileUser.uid is invalid:", profileUser.uid);
+        toast({ title: "Error", description: "Target user ID is invalid. Cannot start chat.", variant: "destructive" });
+        return;
+    }
+
+    console.log(`[handleMessage] Current User: UID=${currentUser.uid}, Name=${currentUser.displayName}, Username=${currentUser.username}`);
+    console.log(`[handleMessage] Profile User: UID=${profileUser.uid}, Name=${profileUser.displayName}, Username=${profileUser.username}`);
+
+    const chatId = getChatId(currentUser.uid, profileUser.uid);
+    console.log(`[handleMessage] Generated Chat ID: ${chatId}`);
+    if (!chatId || !chatId.includes('_')) {
+        console.error("[handleMessage] Critical: Generated chatId is invalid:", chatId);
+        toast({ title: "Error", description: "Could not generate a valid chat ID.", variant: "destructive" });
+        return;
+    }
+
+    const participantsArray = [currentUser.uid, profileUser.uid];
+    console.log(`[handleMessage] Participants Array (unsorted):`, participantsArray.map(p => ({ uid: p, type: typeof p })));
+    
+    const sortedParticipantsArray = [...participantsArray].sort();
+    console.log(`[handleMessage] Participants Array (sorted):`, sortedParticipantsArray.map(p => ({ uid: p, type: typeof p })));
+
+    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string' || sortedParticipantsArray[0].trim() === '' || sortedParticipantsArray[1].trim() === '') {
+        console.error("[handleMessage] Critical: sortedParticipantsArray is invalid:", sortedParticipantsArray);
+        toast({ title: "Error", description: "Invalid participant data for chat.", variant: "destructive" });
+        return;
+    }
+
+
+    const chatDocRef = doc(db, 'chats', chatId);
+
+    try {
+      setFollowActionInProgress(true); // Using this for general loading state of this action
+      const chatDocSnap = await getDoc(chatDocRef);
+
+      if (!chatDocSnap.exists()) {
+        console.log(`[handleMessage] Chat document ${chatId} does not exist. Creating new chat.`);
+        const chatDataToWrite = {
+          id: chatId,
+          participants: sortedParticipantsArray,
+          participantDetails: {
+            [currentUser.uid]: {
+              uid: currentUser.uid,
+              displayName: currentUser.displayName || null,
+              photoURL: currentUser.photoURL || null,
+              username: currentUser.username || null,
+            },
+            [profileUser.uid]: {
+              uid: profileUser.uid,
+              displayName: profileUser.displayName || null,
+              photoURL: profileUser.photoURL || null,
+              username: profileUser.username || null,
+            },
+          },
+          lastMessage: null,
+          updatedAt: serverTimestamp(),
+          unreadCounts: {
+            [currentUser.uid]: 0,
+            [profileUser.uid]: 0,
+          },
+        };
+        
+        console.log("[handleMessage] --- PRE-CHECK for Firestore 'allow create' rule for /chats/{chatId} ---");
+        console.log(`Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;`);
+        console.log(`1. request.auth != null (client-side perspective): ${!!currentUser}`);
+        console.log(`2. request.auth.uid (client-side perspective): ${currentUser?.uid}`);
+        console.log(`   request.resource.data.participants (to be written):`, chatDataToWrite.participants.map(p => ({ uid: p, type: typeof p })));
+        const isAuthUidInParticipants = currentUser?.uid ? chatDataToWrite.participants.includes(currentUser.uid) : false;
+        console.log(`   Is request.auth.uid in request.resource.data.participants? : ${isAuthUidInParticipants}`);
+        console.log(`3. request.resource.data.participants.size() (to be written): ${chatDataToWrite.participants.length}`);
+        console.log("[handleMessage] --- End of PRE-CHECK ---");
+        console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.parse(JSON.stringify({...chatDataToWrite, updatedAt: "SERVER_TIMESTAMP_PLACEHOLDER"})));
+
+
+        await setDoc(chatDocRef, chatDataToWrite);
+        console.log(`[handleMessage] Successfully created chat document ${chatId}.`);
+      } else {
+        console.log(`[handleMessage] Chat document ${chatId} already exists.`);
+      }
+      router.push(`/messages/${chatId}`);
+    } catch (error: any) {
+      console.error('[handleMessage] Error ensuring chat exists or navigating:', error);
+      let errorMessage = "Could not start conversation.";
+      if (error.code) {
+        console.error(`[handleMessage] Firebase Error Code: ${error.code}`);
+        errorMessage = `Could not start conversation. (Code: ${error.code})`;
+      }
+      if (error.message) {
+        console.error(`[handleMessage] Firebase Error Message: ${error.message}`);
+      }
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setFollowActionInProgress(false);
     }
@@ -256,13 +390,22 @@ export default function UserProfilePage() {
                   onClick={handleFollowToggle} 
                   variant={isFollowing ? "outline" : "default"}
                   className={cn(
-                    "flex-1 h-11 text-base font-semibold",
+                    "flex-1 h-11 text-sm font-semibold", // Reduced text size slightly
                     isFollowing ? "border-primary text-primary hover:bg-primary/10" : "bg-primary text-primary-foreground hover:bg-primary/90"
                   )}
                   disabled={loadingFollowStatus || followActionInProgress}
                 >
-                  {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>)}
+                  {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-4 w-4"/> : <UserPlus className="mr-2 h-4 w-4"/>)}
                   {loadingFollowStatus ? 'Checking...' : (followActionInProgress ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Following' : 'Follow'))}
+                </Button>
+                 <Button 
+                  variant="outline"
+                  className="flex-1 h-11 text-sm font-semibold border-input hover:bg-accent"
+                  onClick={handleMessage}
+                  disabled={followActionInProgress || loadingFollowStatus || currentUserLoading}
+                >
+                  {followActionInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <MessageSquare className="mr-2 h-4 w-4"/>}
+                  Message
                 </Button>
             </div>
           )}
@@ -325,3 +468,4 @@ export default function UserProfilePage() {
   );
 }
     
+
