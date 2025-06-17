@@ -48,15 +48,14 @@ function EventsPageContent() {
   const [activeFilters, setActiveFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
   const [tempFilters, setTempFilters] = useState<{ category: Event['category'] | 'All' }>({ category: 'All' });
 
-  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false); // State for ShareSheet
-  const [shareUrl, setShareUrl] = useState(''); // State for share URL
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
 
   useEffect(() => {
     const eventsFromStore = eventStore.getEvents(); // Already sorted by date desc
     setAllEvents(eventsFromStore);
   }, []);
 
-  // Effect to initialize searchQuery from URL
   useEffect(() => {
     const queryFromUrl = searchParams.get('search');
     if (queryFromUrl) {
@@ -67,8 +66,15 @@ function EventsPageContent() {
 
   useEffect(() => {
     let currentEvents = [...allEvents];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
 
-    // Filter by search query
+    // Filter out past events by default from the main list
+    currentEvents = currentEvents.filter(event => {
+        const eventDate = new Date(event.date);
+        return eventDate >= today;
+    });
+
     if (searchQuery.trim() !== '') {
       currentEvents = currentEvents.filter(event =>
         event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -77,16 +83,15 @@ function EventsPageContent() {
       );
     }
 
-    // Filter by category
     if (activeFilters.category !== 'All') {
       currentEvents = currentEvents.filter(event => event.category === activeFilters.category);
     }
-
-    // Events are already sorted by date descending from eventStore, so no need to re-sort unless criteria change
+    
+    // Events are already sorted by date descending from eventStore.
+    // After filtering, this order (most recent future event first) should still be relevant.
     setFilteredEvents(currentEvents);
   }, [searchQuery, allEvents, activeFilters]);
 
-  // Set share URL once when component mounts and window is available
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setShareUrl(window.location.href);
@@ -101,12 +106,11 @@ function EventsPageContent() {
   const handleCloseSearchClick = () => {
     setSearchActive(false);
     setSearchQuery('');
-    // Optionally update URL to remove search param
     router.replace('/events');
   };
 
   const handleFilterIconClick = () => {
-    setTempFilters(activeFilters); // Initialize sheet with current active filters
+    setTempFilters(activeFilters);
     setIsFilterSheetOpen(true);
   };
 
@@ -174,7 +178,7 @@ function EventsPageContent() {
             <Button
               variant="default"
               className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6 py-2.5 h-auto"
-              onClick={() => setIsShareSheetOpen(true)} // Open ShareSheet
+              onClick={() => setIsShareSheetOpen(true)}
             >
               INVITE
             </Button>
@@ -202,8 +206,8 @@ function EventsPageContent() {
             <div className="text-center py-10">
               <p className="text-muted-foreground">
                 {searchQuery.trim() !== '' || activeFilters.category !== 'All'
-                  ? 'No events match your search or filter criteria.'
-                  : 'No events found.'}
+                  ? 'No upcoming events match your search or filter criteria.'
+                  : 'No upcoming events found.'}
               </p>
               <p className="text-sm text-muted-foreground">
                 {searchQuery.trim() !== '' || activeFilters.category !== 'All'
@@ -240,13 +244,6 @@ function EventsPageContent() {
                 ))}
               </RadioGroup>
             </div>
-            {/* Placeholder for more filters like date range or price */}
-            {/* 
-            <div className="border-t pt-4">
-              <Label className="text-base font-semibold mb-3 block">Date Range</Label>
-              <p className="text-sm text-muted-foreground">Date picker coming soon...</p>
-            </div>
-            */}
           </div>
 
           <SheetFooter className="mt-auto pt-4 border-t">
@@ -264,7 +261,6 @@ function EventsPageContent() {
         </SheetContent>
       </Sheet>
 
-      {/* Render ShareSheet */}
       {shareUrl && (
         <ShareSheet
           isOpen={isShareSheetOpen}
@@ -277,8 +273,6 @@ function EventsPageContent() {
   );
 }
 
-// It's good practice to wrap the page content in Suspense when using useSearchParams
-// as it might suspend during initial render or navigation.
 export default function AllEventsPage() {
   return (
     <Suspense fallback={<div>Loading search results...</div>}>
