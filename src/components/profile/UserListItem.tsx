@@ -33,6 +33,9 @@ export function UserListItem({
   const [actionInProgress, setActionInProgress] = useState(false);
   const { toast } = useToast();
 
+  // Log the profileUser details when the component renders or props change
+  console.log(`[UserListItem] Rendering for user: ${profileUser.displayName}, UID: ${profileUser.uid}, Username: ${profileUser.username || 'N/A'}`);
+
   useEffect(() => {
     if (!currentUserUid || !profileUser.uid || currentUserUid === profileUser.uid || !showFollowButton) {
       setLoadingFollowState(false);
@@ -169,3 +172,4 @@ export function UserListItem({
     </div>
   );
 }
+

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import type { Event, Notification, PublicUserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, Timestamp, setDoc } from 'firebase/firestore';
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -76,11 +76,28 @@ export default function UserProfilePage() {
 
     const fetchUserProfileAndCounts = async () => {
       setLoadingProfile(true);
-      setLoadingFollowStatus(true); // Reset loading follow status
+      setLoadingFollowStatus(true); 
       setFollowersCount(<Loader2 className="h-4 w-4 animate-spin" />);
       setFollowingCount(<Loader2 className="h-4 w-4 animate-spin" />);
+
+      // Robust check for userId before any Firestore operation
+      if (!userId || typeof userId !== 'string' || userId.trim() === "" || userId.includes("/") || userId.length > 128) {
+        console.error(`[UserProfilePage] Invalid or malformed userId in params: '${userId}'. Aborting profile fetch.`);
+        setProfileUser(null);
+        setLoadingProfile(false);
+        setLoadingFollowStatus(false);
+        setFollowersCount(0);
+        setFollowingCount(0);
+        toast({
+          title: "Invalid Profile URL",
+          description: "The user ID in the URL is invalid or malformed. Cannot load profile.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       try {
-        console.log(`[UserProfilePage] Fetching profile for userId: ${userId}`);
+        console.log(`[UserProfilePage] Fetching profile for valid userId: ${userId}`);
         const userDocRef = doc(db, 'users', userId);
         const userDocSnap = await getDoc(userDocRef);
 
@@ -120,15 +137,15 @@ export default function UserProfilePage() {
           setFollowingCount(0);
         }
       } catch (error: any) {
-        console.error(`Error fetching user profile for ${userId}:`, error);
+        console.error(`[UserProfilePage] Error fetching user profile for ${userId}:`, error); // Full error object
         setProfileUser(null);
         setFollowersCount(0);
         setFollowingCount(0);
         toast({
             title: "Profile Load Error",
-            description: `Could not load profile for User ID: ${userId}. ${error.message ? `Details: ${error.message}` : 'Please try again.'}`,
+            description: `Could not load profile. ${error.code ? `Code: ${error.code}. ` : ''}${error.message ? `Details: ${error.message}` : 'Please try again.'}`,
             variant: "destructive",
-            duration: 7000
+            duration: 9000
         });
       } finally {
         setLoadingProfile(false);
@@ -192,103 +209,113 @@ export default function UserProfilePage() {
   };
 
   const handleMessage = async () => {
-    console.log("[handleMessage] Attempting to message user...");
-    if (!currentUser || !profileUser || currentUserLoading) {
-      console.warn("[handleMessage] Pre-condition failed: currentUser or profileUser is null, or auth is loading.");
-      if (!currentUser && !currentUserLoading) {
-          toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
-      } else if (!profileUser) {
-          toast({ title: "Error", description: "Target user profile is not available.", variant: "destructive" });
-      }
-      return;
+    console.log("[handleMessage] Initiating message attempt...");
+
+    if (currentUserLoading) {
+        console.warn("[handleMessage] Auth state still loading. Aborting.");
+        toast({ title: "Please Wait", description: "Authentication is still loading.", variant: "default" });
+        return;
+    }
+    if (!currentUser) {
+        console.warn("[handleMessage] No current user. Aborting. Redirecting to login.");
+        toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
+        router.push('/login');
+        return;
+    }
+    if (!profileUser) {
+        console.warn("[handleMessage] No profile user data. Aborting.");
+        toast({ title: "Error", description: "Target user profile is not available.", variant: "destructive" });
+        return;
+    }
+    if (currentUser.uid === profileUser.uid) {
+        console.log("[handleMessage] User tried to message themselves.");
+        toast({ description: "You cannot message yourself." });
+        return;
     }
 
-    if (currentUser.uid === profileUser.uid) {
-      console.log("[handleMessage] User tried to message themselves.");
-      toast({ description: "You cannot message yourself." });
-      return;
-    }
-    
+    // Critical UID validation
     if (!currentUser.uid || typeof currentUser.uid !== 'string' || currentUser.uid.trim() === '') {
-        console.error("[handleMessage] Critical: currentUser.uid is invalid:", currentUser.uid);
+        console.error("[handleMessage] Critical: currentUser.uid is invalid:", currentUser.uid, `(Type: ${typeof currentUser.uid})`);
         toast({ title: "Error", description: "Your user ID is invalid. Cannot start chat.", variant: "destructive" });
         return;
     }
     if (!profileUser.uid || typeof profileUser.uid !== 'string' || profileUser.uid.trim() === '') {
-        console.error("[handleMessage] Critical: profileUser.uid is invalid:", profileUser.uid);
+        console.error("[handleMessage] Critical: profileUser.uid is invalid:", profileUser.uid, `(Type: ${typeof profileUser.uid})`);
         toast({ title: "Error", description: "Target user ID is invalid. Cannot start chat.", variant: "destructive" });
         return;
     }
-
-    console.log(`[handleMessage] Current User: UID=${currentUser.uid}, Name=${currentUser.displayName}, Username=${currentUser.username}`);
-    console.log(`[handleMessage] Profile User: UID=${profileUser.uid}, Name=${profileUser.displayName}, Username=${profileUser.username}`);
+    
+    console.log(`[handleMessage] Current User Validated: UID=${currentUser.uid} (Type: ${typeof currentUser.uid}), Name=${currentUser.displayName || 'N/A'}, Username=${currentUser.username || 'N/A'}`);
+    console.log(`[handleMessage] Profile User Validated: UID=${profileUser.uid} (Type: ${typeof profileUser.uid}), Name=${profileUser.displayName || 'N/A'}, Username=${profileUser.username || 'N/A'}`);
 
     const chatId = getChatId(currentUser.uid, profileUser.uid);
-    console.log(`[handleMessage] Generated Chat ID: ${chatId}`);
-    if (!chatId || !chatId.includes('_')) {
+    console.log(`[handleMessage] Generated Chat ID: ${chatId} (Type: ${typeof chatId})`);
+    if (!chatId || !chatId.includes('_') || chatId.split('_').length !== 2 || chatId.startsWith('_') || chatId.endsWith('_')) {
         console.error("[handleMessage] Critical: Generated chatId is invalid:", chatId);
         toast({ title: "Error", description: "Could not generate a valid chat ID.", variant: "destructive" });
         return;
     }
-
+    
     const participantsArray = [currentUser.uid, profileUser.uid];
     console.log(`[handleMessage] Participants Array (unsorted):`, participantsArray.map(p => ({ uid: p, type: typeof p })));
     
     const sortedParticipantsArray = [...participantsArray].sort();
     console.log(`[handleMessage] Participants Array (sorted):`, sortedParticipantsArray.map(p => ({ uid: p, type: typeof p })));
 
-    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string' || sortedParticipantsArray[0].trim() === '' || sortedParticipantsArray[1].trim() === '') {
+    if (sortedParticipantsArray.length !== 2 || 
+        typeof sortedParticipantsArray[0] !== 'string' || sortedParticipantsArray[0].trim() === '' ||
+        typeof sortedParticipantsArray[1] !== 'string' || sortedParticipantsArray[1].trim() === '' ||
+        sortedParticipantsArray[0] === sortedParticipantsArray[1] ) {
         console.error("[handleMessage] Critical: sortedParticipantsArray is invalid:", sortedParticipantsArray);
         toast({ title: "Error", description: "Invalid participant data for chat.", variant: "destructive" });
         return;
     }
 
-
     const chatDocRef = doc(db, 'chats', chatId);
 
+    const chatDataToWrite = {
+      id: chatId,
+      participants: sortedParticipantsArray,
+      participantDetails: {
+        [currentUser.uid]: {
+          uid: currentUser.uid,
+          displayName: currentUser.displayName || null,
+          photoURL: currentUser.photoURL || null,
+          username: currentUser.username || null,
+        },
+        [profileUser.uid]: {
+          uid: profileUser.uid,
+          displayName: profileUser.displayName || null,
+          photoURL: profileUser.photoURL || null,
+          username: profileUser.username || null,
+        },
+      },
+      lastMessage: null, // Explicitly null for new chats
+      updatedAt: serverTimestamp(),
+      unreadCounts: {
+        [currentUser.uid]: 0,
+        [profileUser.uid]: 0,
+      },
+    };
+    
+    console.log("[handleMessage] --- PRE-CHECK for Firestore 'allow create' rule for /chats/{chatId} ---");
+    console.log(`Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;`);
+    console.log(`1. request.auth != null (client-side perspective): ${!!currentUser}`);
+    console.log(`2. request.auth.uid (client-side perspective): ${currentUser?.uid}`);
+    console.log(`   request.resource.data.participants (to be written):`, chatDataToWrite.participants.map(p => ({ uid: p, type: typeof p })));
+    const isAuthUidInParticipants = currentUser?.uid ? chatDataToWrite.participants.includes(currentUser.uid) : false;
+    console.log(`   Is request.auth.uid in request.resource.data.participants? : ${isAuthUidInParticipants}`);
+    console.log(`3. request.resource.data.participants.size() (to be written): ${chatDataToWrite.participants.length}`);
+    console.log("[handleMessage] --- End of PRE-CHECK ---");
+    console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.parse(JSON.stringify({...chatDataToWrite, updatedAt: "SERVER_TIMESTAMP_PLACEHOLDER", lastMessage: null })));
+
+
     try {
-      setFollowActionInProgress(true); // Using this for general loading state of this action
+      setFollowActionInProgress(true); 
       const chatDocSnap = await getDoc(chatDocRef);
 
       if (!chatDocSnap.exists()) {
-        console.log(`[handleMessage] Chat document ${chatId} does not exist. Creating new chat.`);
-        const chatDataToWrite = {
-          id: chatId,
-          participants: sortedParticipantsArray,
-          participantDetails: {
-            [currentUser.uid]: {
-              uid: currentUser.uid,
-              displayName: currentUser.displayName || null,
-              photoURL: currentUser.photoURL || null,
-              username: currentUser.username || null,
-            },
-            [profileUser.uid]: {
-              uid: profileUser.uid,
-              displayName: profileUser.displayName || null,
-              photoURL: profileUser.photoURL || null,
-              username: profileUser.username || null,
-            },
-          },
-          lastMessage: null,
-          updatedAt: serverTimestamp(),
-          unreadCounts: {
-            [currentUser.uid]: 0,
-            [profileUser.uid]: 0,
-          },
-        };
-        
-        console.log("[handleMessage] --- PRE-CHECK for Firestore 'allow create' rule for /chats/{chatId} ---");
-        console.log(`Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;`);
-        console.log(`1. request.auth != null (client-side perspective): ${!!currentUser}`);
-        console.log(`2. request.auth.uid (client-side perspective): ${currentUser?.uid}`);
-        console.log(`   request.resource.data.participants (to be written):`, chatDataToWrite.participants.map(p => ({ uid: p, type: typeof p })));
-        const isAuthUidInParticipants = currentUser?.uid ? chatDataToWrite.participants.includes(currentUser.uid) : false;
-        console.log(`   Is request.auth.uid in request.resource.data.participants? : ${isAuthUidInParticipants}`);
-        console.log(`3. request.resource.data.participants.size() (to be written): ${chatDataToWrite.participants.length}`);
-        console.log("[handleMessage] --- End of PRE-CHECK ---");
-        console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.parse(JSON.stringify({...chatDataToWrite, updatedAt: "SERVER_TIMESTAMP_PLACEHOLDER"})));
-
-
+        console.log(`[handleMessage] Chat document ${chatId} does not exist. Attempting to create new chat.`);
         await setDoc(chatDocRef, chatDataToWrite);
         console.log(`[handleMessage] Successfully created chat document ${chatId}.`);
       } else {
@@ -390,7 +417,7 @@ export default function UserProfilePage() {
                   onClick={handleFollowToggle} 
                   variant={isFollowing ? "outline" : "default"}
                   className={cn(
-                    "flex-1 h-11 text-sm font-semibold", // Reduced text size slightly
+                    "flex-1 h-11 text-sm font-semibold", 
                     isFollowing ? "border-primary text-primary hover:bg-primary/10" : "bg-primary text-primary-foreground hover:bg-primary/90"
                   )}
                   disabled={loadingFollowStatus || followActionInProgress}
@@ -404,7 +431,7 @@ export default function UserProfilePage() {
                   onClick={handleMessage}
                   disabled={followActionInProgress || loadingFollowStatus || currentUserLoading}
                 >
-                  {followActionInProgress ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <MessageSquare className="mr-2 h-4 w-4"/>}
+                  {followActionInProgress && !(loadingFollowStatus || currentUserLoading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <MessageSquare className="mr-2 h-4 w-4"/>}
                   Message
                 </Button>
             </div>
@@ -468,4 +495,3 @@ export default function UserProfilePage() {
   );
 }
     
-
