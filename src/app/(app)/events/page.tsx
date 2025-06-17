@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import type { Event } from '@/types';
 import { eventStore } from '@/lib/eventStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Search, Filter as FilterIcon, Gift, Ticket, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Search, Filter as FilterIcon, Gift, Ticket, X as XIcon, Loader2 } from 'lucide-react';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,21 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ShareSheet } from '@/components/sharing/ShareSheet';
 import { motion } from 'framer-motion';
 
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query, orderBy, Timestamp, where, startAt, endAt } from 'firebase/firestore';
+import { format, startOfDay } from 'date-fns';
+
+// Helper to convert Firestore timestamp to JS Date, then to YYYY-MM-DD string
+const formatFirestoreDate = (timestamp: any): string => {
+  if (timestamp instanceof Timestamp) {
+    return format(timestamp.toDate(), 'yyyy-MM-dd');
+  }
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp instanceof Date) return format(timestamp, 'yyyy-MM-dd');
+  return format(new Date(), 'yyyy-MM-dd'); // Fallback
+};
+
+
 const filterCategories: Array<{ value: Event['category'] | 'All', label: string }> = [
   { value: 'All', label: 'All Categories' },
   { value: 'Music', label: 'Music' },
@@ -39,8 +54,10 @@ function EventsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [allEventsFromStore, setAllEventsFromStore] = useState<Event[]>([]); // For events from eventStore (after Firestore fetch)
+  const [filteredEventsForDisplay, setFilteredEventsForDisplay] = useState<Event[]>([]);
+
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -51,11 +68,54 @@ function EventsPageContent() {
   const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  useEffect(() => {
-    const eventsFromStore = eventStore.getEvents(); // Already sorted by date desc
-    setAllEvents(eventsFromStore);
+  // Fetch events from Firestore and populate eventStore
+  const fetchAndSetEvents = useCallback(async () => {
+    setIsLoadingEvents(true);
+    try {
+      const eventsColRef = collection(db, 'events');
+      // Query upcoming or current events by default, ordered by date
+      const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd');
+      const q = firestoreQuery(
+        eventsColRef, 
+        where('date', '>=', todayStr), 
+        orderBy('date', 'asc'), 
+        orderBy('time', 'asc') // Secondary sort by time if available
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const fetchedEvents: Event[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          date: formatFirestoreDate(data.date),
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : undefined,
+        } as Event;
+      });
+      
+      eventStore.setEvents(fetchedEvents); // Update eventStore
+    } catch (error) {
+      console.error("Error fetching events from Firestore:", error);
+    } finally {
+      setIsLoadingEvents(false);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchAndSetEvents();
+  }, [fetchAndSetEvents]);
+
+  // Subscribe to eventStore updates (e.g., for bookmarks)
+  useEffect(() => {
+    const handleStoreUpdate = () => {
+      setAllEventsFromStore(eventStore.getEvents());
+    };
+    const unsubscribe = eventStore.subscribe(handleStoreUpdate);
+    handleStoreUpdate(); // Initial sync
+    return () => unsubscribe();
+  }, []);
+
+  // Search query from URL
   useEffect(() => {
     const queryFromUrl = searchParams.get('search');
     if (queryFromUrl) {
@@ -64,16 +124,14 @@ function EventsPageContent() {
     }
   }, [searchParams]);
 
+  // Filter events for display whenever source data or filters change
   useEffect(() => {
-    let currentEvents = [...allEvents];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+    let currentEvents = [...allEventsFromStore]; // Start with events from store (which are from Firestore)
+    const today = startOfDay(new Date());
 
-    // Filter out past events by default from the main list
-    currentEvents = currentEvents.filter(event => {
-        const eventDate = new Date(event.date);
-        return eventDate >= today;
-    });
+    // Default: Filter out past events (already handled by Firestore query for initial load)
+    // If allEventsFromStore could contain past events from other sources, uncomment:
+    // currentEvents = currentEvents.filter(event => new Date(event.date) >= today);
 
     if (searchQuery.trim() !== '') {
       currentEvents = currentEvents.filter(event =>
@@ -87,10 +145,11 @@ function EventsPageContent() {
       currentEvents = currentEvents.filter(event => event.category === activeFilters.category);
     }
     
-    // Events are already sorted by date descending from eventStore.
-    // After filtering, this order (most recent future event first) should still be relevant.
-    setFilteredEvents(currentEvents);
-  }, [searchQuery, allEvents, activeFilters]);
+    // Sort: events from Firestore are already sorted by date ASC, time ASC.
+    // If further client-side sorting is desired after filtering, add it here.
+    setFilteredEventsForDisplay(currentEvents);
+  }, [searchQuery, allEventsFromStore, activeFilters]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -99,35 +158,26 @@ function EventsPageContent() {
   }, []);
 
 
-  const handleSearchIconClick = () => {
-    setSearchActive(true);
-  };
-
+  const handleSearchIconClick = () => setSearchActive(true);
   const handleCloseSearchClick = () => {
     setSearchActive(false);
     setSearchQuery('');
     router.replace('/events');
   };
-
   const handleFilterIconClick = () => {
     setTempFilters(activeFilters);
     setIsFilterSheetOpen(true);
   };
-
   const handleApplyFilters = () => {
     setActiveFilters(tempFilters);
     setIsFilterSheetOpen(false);
   };
-
-  const handleClearFiltersInSheet = () => {
-    setTempFilters({ category: 'All' });
-  };
-
+  const handleClearFiltersInSheet = () => setTempFilters({ category: 'All' });
   const handleCategoryChangeInSheet = (category: string) => {
     setTempFilters(prev => ({ ...prev, category: category as Event['category'] | 'All' }));
   };
   
-  const currentEventsToDisplay = filteredEvents;
+  const currentEventsToDisplay = filteredEventsForDisplay;
 
   return (
     <motion.div
@@ -196,7 +246,9 @@ function EventsPageContent() {
         </div>
 
         <div className="space-y-4">
-          {currentEventsToDisplay.length > 0 ? (
+          {isLoadingEvents ? (
+            <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
+          ) : currentEventsToDisplay.length > 0 ? (
             currentEventsToDisplay.map(event => (
               <Link key={event.id} href={`/events/${event.id}`} passHref>
                 <AllEventsEventItem event={event} />
@@ -275,9 +327,8 @@ function EventsPageContent() {
 
 export default function AllEventsPage() {
   return (
-    <Suspense fallback={<div>Loading search results...</div>}>
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
       <EventsPageContent />
     </Suspense>
   );
 }
-    

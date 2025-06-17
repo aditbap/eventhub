@@ -2,42 +2,84 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth'; // For user context if needed for future server-side bookmarks
 import type { Event } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, Bookmark, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { eventStore } from '@/lib/eventStore';
+import { eventStore } from '@/lib/eventStore'; // Still used for client-side bookmark management
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem'; 
 import Link from 'next/link';
+import { db } from '@/lib/firebase'; // Import db
+import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore'; // Firestore imports
+import { format } from 'date-fns';
+
+// Helper to convert Firestore timestamp to JS Date, then to YYYY-MM-DD string
+const formatFirestoreDate = (timestamp: any): string => {
+  if (timestamp instanceof Timestamp) {
+    return format(timestamp.toDate(), 'yyyy-MM-dd');
+  }
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp instanceof Date) return format(timestamp, 'yyyy-MM-dd');
+  return format(new Date(), 'yyyy-MM-dd'); // Fallback
+};
+
 
 export default function SavedEventsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const [savedEvents, setSavedEvents] = useState<Event[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const { user, loading: authLoading } = useAuth(); // user might be needed if bookmarks become server-side
+  const [savedEventsFromStore, setSavedEventsFromStore] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true); // For initial loading from Firestore
   const router = useRouter();
 
+  // Fetch all events from Firestore first, then filter by local bookmark status
   useEffect(() => {
-    // No specific user check for saved events as bookmarks are client-side for now
-    // but authLoading check is good practice if this page were to become protected.
-    if (authLoading) return; 
-
-    const fetchAndSetSavedEvents = () => {
+    const fetchAllEventsAndFilterSaved = async () => {
       setLoadingEvents(true);
-      const allEvents = eventStore.getEvents(); // Gets events sorted by date desc
-      const userSavedEvents = allEvents.filter(event => event.isBookmarked === true);
-      // Optional: re-sort if needed, e.g., by bookmark date or keep as is (event date desc)
-      setSavedEvents(userSavedEvents);
-      setLoadingEvents(false);
+      try {
+        const eventsColRef = collection(db, 'events');
+        const q = query(eventsColRef, orderBy('date', 'desc')); // Example: order by date
+        const querySnapshot = await getDocs(q);
+        const allFetchedEvents: Event[] = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: formatFirestoreDate(data.date),
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : undefined,
+            // isBookmarked will be determined by eventStore
+          } as Event;
+        });
+        
+        // Update eventStore with all events (if not already up-to-date)
+        // This ensures eventStore has the latest event data to check against for bookmarks
+        eventStore.setEvents(allFetchedEvents); 
+        
+        // Now get events from store, which will include local bookmark status
+        const currentEventsInStore = eventStore.getEvents();
+        const userSavedEvents = currentEventsInStore.filter(event => event.isBookmarked === true);
+        setSavedEventsFromStore(userSavedEvents);
+
+      } catch (error) {
+        console.error("Error fetching events for saved list:", error);
+      } finally {
+        setLoadingEvents(false);
+      }
     };
 
-    const unsubscribe = eventStore.subscribe(fetchAndSetSavedEvents);
-    fetchAndSetSavedEvents(); // Initial fetch
+    fetchAllEventsAndFilterSaved();
 
-    return () => unsubscribe(); // Cleanup subscription
-  }, [authLoading]);
+    // Subscribe to eventStore updates to reflect bookmark changes made on other pages
+    const handleStoreUpdate = () => {
+       const currentEventsInStore = eventStore.getEvents();
+       const userSavedEvents = currentEventsInStore.filter(event => event.isBookmarked === true);
+       setSavedEventsFromStore(userSavedEvents);
+    };
+    const unsubscribe = eventStore.subscribe(handleStoreUpdate);
+    return () => unsubscribe();
+  }, []);
 
-  if (authLoading || loadingEvents) {
+
+  if (authLoading || loadingEvents) { // Show loader if auth is loading OR initial events fetch is happening
     return (
       <div className="flex justify-center items-center min-h-screen bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -56,9 +98,9 @@ export default function SavedEventsPage() {
       </header>
 
       <main className="p-4">
-        {savedEvents.length > 0 ? (
+        {savedEventsFromStore.length > 0 ? (
           <div className="space-y-4">
-            {savedEvents.map((event) => (
+            {savedEventsFromStore.map((event) => (
               <Link key={event.id} href={`/events/${event.id}`} passHref>
                 <AllEventsEventItem event={event} />
               </Link>

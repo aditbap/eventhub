@@ -7,9 +7,23 @@ import type { Event } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft, CalendarPlus, ListChecks } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { eventStore } from '@/lib/eventStore';
-import { AllEventsEventItem } from '@/components/events/AllEventsEventItem'; // Reusing this component
+// Removed eventStore import for fetching events
+import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import Link from 'next/link';
+
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { format } from 'date-fns';
+
+// Helper to convert Firestore timestamp to JS Date, then to YYYY-MM-DD string
+const formatFirestoreDate = (timestamp: any): string => {
+  if (timestamp instanceof Timestamp) {
+    return format(timestamp.toDate(), 'yyyy-MM-dd');
+  }
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp instanceof Date) return format(timestamp, 'yyyy-MM-dd');
+  return format(new Date(), 'yyyy-MM-dd'); // Fallback
+};
 
 export default function MyEventsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -24,19 +38,32 @@ export default function MyEventsPage() {
     }
 
     if (user) {
-      const fetchAndSetMyEvents = () => {
+      const fetchMyEvents = async () => {
         setLoadingEvents(true);
-        const allEvents = eventStore.getEvents(); // Gets events sorted by date desc
-        const userCreatedEvents = allEvents.filter(event => event.creatorId === user.uid);
-        // Optional: re-sort if needed, e.g., by creation date or keep as is (event date desc)
-        setMyEvents(userCreatedEvents);
-        setLoadingEvents(false);
+        try {
+          const eventsRef = collection(db, 'events');
+          // Query events created by the current user, order by creation date or event date
+          const q = query(eventsRef, where('creatorId', '==', user.uid), orderBy('createdAt', 'desc')); 
+          // Alternative: orderBy('date', 'desc')
+          
+          const querySnapshot = await getDocs(q);
+          const userCreatedEvents: Event[] = querySnapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              ...data,
+              date: formatFirestoreDate(data.date),
+              createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : undefined,
+            } as Event;
+          });
+          setMyEvents(userCreatedEvents);
+        } catch (error) {
+            console.error("Error fetching user's events from Firestore:", error);
+        } finally {
+            setLoadingEvents(false);
+        }
       };
-
-      const unsubscribe = eventStore.subscribe(fetchAndSetMyEvents);
-      fetchAndSetMyEvents(); // Initial fetch
-
-      return () => unsubscribe(); // Cleanup subscription
+      fetchMyEvents();
     } else if (!authLoading) {
       setLoadingEvents(false);
     }
