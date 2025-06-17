@@ -20,6 +20,7 @@ import {
 import { doc, setDoc, getDoc, serverTimestamp, Timestamp, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useRouter, usePathname } from 'next/navigation';
+import { differenceInDays } from 'date-fns';
 
 export interface User {
   uid: string;
@@ -28,6 +29,7 @@ export interface User {
   username: string | null; 
   photoURL?: string | null;
   bio?: string | null; 
+  usernameLastChangedAt?: Timestamp | null; // Added for username change tracking
 }
 
 interface AuthContextType {
@@ -43,7 +45,7 @@ interface AuthContextType {
   updateUserGender: (newGender: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
   updateUserProfilePicture: (file: File) => Promise<{ success: boolean, photoURL?: string, error?: { message: string, code?: string } }>;
   updateUserBio: (newBio: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>; 
-  updateUserUsername: (newUsername: string) => Promise<{ success: boolean, error?: { message: string, code?: string } }>;
+  updateUserUsername: (newUsername: string) => Promise<{ success: boolean, error?: { message: string, code?: string, nextChangeDate?: Date } }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,10 +63,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(userDocRef);
         let userBio = null;
         let username = null;
+        let usernameLastChangedAt = null;
         if (docSnap.exists()) {
           const data = docSnap.data();
           userBio = data?.bio || null;
           username = data?.username || null; 
+          usernameLastChangedAt = data?.usernameLastChangedAt || null;
         }
         setUser({
           uid: firebaseUser.uid,
@@ -73,6 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           username: username, 
           photoURL: firebaseUser.photoURL,
           bio: userBio,
+          usernameLastChangedAt: usernameLastChangedAt,
         });
       } else {
         setUser(null);
@@ -93,10 +98,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const docSnap = await getDoc(userDocRef);
         let userBio = null;
         let username = null;
+        let usernameLastChangedAt = null;
         if (docSnap.exists()) {
           const data = docSnap.data();
           userBio = data?.bio || null;
           username = data?.username || null;
+          usernameLastChangedAt = data?.usernameLastChangedAt || null;
         }
         setUser({ 
           uid: userCredential.user.uid, 
@@ -105,6 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           username: username,
           photoURL: userCredential.user.photoURL,
           bio: userBio,
+          usernameLastChangedAt: usernameLastChangedAt,
         });
       }
     } catch (error) {
@@ -135,15 +143,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userCredential.user) {
         await updateProfile(userCredential.user, { displayName: name });
         
-        const userData = {
+        const userData: Omit<User, 'bio' | 'usernameLastChangedAt'> & { createdAt: Timestamp, updatedAt: Timestamp, bio: null, usernameLastChangedAt: null } = {
           uid: userCredential.user.uid,
           displayName: name,
           username: normalizedUsername,
           email: email,
           photoURL: userCredential.user.photoURL || null,
           bio: null, 
-          createdAt: serverTimestamp(), 
-          updatedAt: serverTimestamp()
+          usernameLastChangedAt: null, // Initial set
+          createdAt: serverTimestamp() as Timestamp, 
+          updatedAt: serverTimestamp() as Timestamp
         };
         await setDoc(doc(db, "users", userCredential.user.uid), userData);
 
@@ -154,6 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           username: normalizedUsername,
           photoURL: userCredential.user.photoURL,
           bio: null,
+          usernameLastChangedAt: null,
         };
         setUser(loggedInUser);
         return { success: true, user: loggedInUser };
@@ -179,6 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDoc = await getDoc(userDocRef);
         let userBio = null;
         let username = null;
+        let usernameLastChangedAt = null;
 
         const googleUserData: any = { 
             uid: firebaseUser.uid,
@@ -191,17 +202,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!userDoc.exists()) {
           googleUserData.createdAt = serverTimestamp();
           googleUserData.bio = null; 
-          googleUserData.username = null; 
+          googleUserData.username = null;
+          googleUserData.usernameLastChangedAt = null; // Initial for Google sign-up
           await setDoc(userDocRef, googleUserData);
           userBio = null;
         } else {
            const existingData = userDoc.data();
            userBio = existingData?.bio || null;
            username = existingData?.username || null; 
+           usernameLastChangedAt = existingData?.usernameLastChangedAt || null;
            await updateDoc(userDocRef, { 
             displayName: firebaseUser.displayName || existingData?.displayName || null,
             photoURL: firebaseUser.photoURL || existingData?.photoURL || null,
             username: username, 
+            // usernameLastChangedAt is not updated here unless explicitly changing username
             updatedAt: serverTimestamp(),
           });
         }
@@ -212,6 +226,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           username: username, 
           photoURL: firebaseUser.photoURL,
           bio: userBio,
+          usernameLastChangedAt: usernameLastChangedAt,
         });
       }
     } catch (error: any) {
@@ -282,7 +297,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
   
-  const updateUserUsername = useCallback(async (newUsernameInput: string): Promise<{ success: boolean, error?: { message: string, code?: string } }> => {
+  const updateUserUsername = useCallback(async (newUsernameInput: string): Promise<{ success: boolean, error?: { message: string, code?: string, nextChangeDate?: Date } }> => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       return { success: false, error: { message: "No user logged in." } };
@@ -294,32 +309,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      let currentUsernameInDb: string | null = null;
+      let lastChangedTimestamp: Timestamp | null = null;
+
+      if (userDocSnap.exists()) {
+        currentUsernameInDb = userDocSnap.data()?.username || null;
+        lastChangedTimestamp = userDocSnap.data()?.usernameLastChangedAt || null;
+      }
+
+      if (currentUsernameInDb && currentUsernameInDb === normalizedNewUsername) {
+        return { success: false, error: { message: "This is already your current username." } };
+      }
+
+      // Check 30-day restriction if it's an update to an existing username
+      if (currentUsernameInDb && lastChangedTimestamp) {
+        const lastChangedDate = lastChangedTimestamp.toDate();
+        const daysSinceLastChange = differenceInDays(new Date(), lastChangedDate);
+        if (daysSinceLastChange < 30) {
+          const nextChangeDate = new Date(lastChangedDate);
+          nextChangeDate.setDate(lastChangedDate.getDate() + 30);
+          return { 
+            success: false, 
+            error: { 
+              message: `You can change your username again after ${nextChangeDate.toLocaleDateString()}.`,
+              nextChangeDate: nextChangeDate 
+            } 
+          };
+        }
+      }
+
+      // Check uniqueness
       const usersRef = collection(db, "users");
       const qUsername = query(usersRef, where("username", "==", normalizedNewUsername));
       const usernameSnapshot = await getDocs(qUsername);
       
-      let isTaken = false;
-      usernameSnapshot.forEach(docSnap => {
-        if (docSnap.id !== currentUser.uid) { 
-          isTaken = true;
+      if (!usernameSnapshot.empty) {
+        // Ensure it's not the current user's own username if they somehow trigger this (should be caught by currentUsernameInDb === normalizedNewUsername)
+        let isTakenByOther = false;
+        usernameSnapshot.forEach(docSnap => {
+            if (docSnap.id !== currentUser.uid) {
+                isTakenByOther = true;
+            }
+        });
+        if (isTakenByOther) {
+            return { success: false, error: { message: "Username is already taken. Please choose another one." } };
         }
-      });
-
-      if (isTaken) {
-        return { success: false, error: { message: "Username is already taken. Please choose another one." } };
       }
-
-      const userDocRef = doc(db, "users", currentUser.uid);
-      const userDocSnap = await getDoc(userDocRef); 
 
       const firestoreData: any = {
         username: normalizedNewUsername,
         updatedAt: serverTimestamp()
       };
 
+      // Set usernameLastChangedAt only if it's an actual change from an existing username
+      if (currentUsernameInDb && currentUsernameInDb !== normalizedNewUsername) {
+        firestoreData.usernameLastChangedAt = serverTimestamp();
+      } else if (!currentUsernameInDb) { // Initial set
+        firestoreData.usernameLastChangedAt = null; // Or don't set it, meaning first *change* is allowed
+      }
+      
       if (userDocSnap.exists()) {
         await updateDoc(userDocRef, firestoreData);
       } else {
+        // This case should ideally be handled by registration or initial set-username page
+        // If user doc doesn't exist, we are creating it with the username
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           email: currentUser.email,
@@ -328,10 +383,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           bio: null,
           ...firestoreData, 
           createdAt: serverTimestamp(),
+          usernameLastChangedAt: firestoreData.usernameLastChangedAt // ensure it's correctly set
         });
       }
-
-      setUser(prevUser => prevUser ? { ...prevUser, username: normalizedNewUsername } : null);
+      
+      setUser(prevUser => prevUser ? { 
+          ...prevUser, 
+          username: normalizedNewUsername, 
+          usernameLastChangedAt: firestoreData.usernameLastChangedAt instanceof Timestamp ? firestoreData.usernameLastChangedAt : (firestoreData.usernameLastChangedAt === null ? null : prevUser.usernameLastChangedAt) 
+      } : null);
       return { success: true };
 
     } catch (err: any) {

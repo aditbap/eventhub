@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Camera, Loader2, LogOut, ShieldAlert, CheckCircle, CalendarIcon } from 'lucide-react';
+import { ArrowLeft, ChevronRight, User as UserIcon, Mail, Lock, Phone, UserRound as GenderIcon, Camera, Loader2, LogOut, ShieldAlert, CheckCircle, CalendarIcon, AtSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -13,35 +13,44 @@ import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { ChangeNameDialog } from '@/components/settings/ChangeNameDialog';
 import { ChangeBirthDateDialog } from '@/components/settings/ChangeBirthDateDialog';
 import { ChangeGenderDialog } from '@/components/settings/ChangeGenderDialog';
+import { ChangeUsernameDialog } from '@/components/settings/ChangeUsernameDialog'; // Import new dialog
 import { useToast } from "@/hooks/use-toast";
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { formatDistanceToNowStrict } from 'date-fns';
 
 
 interface SettingsItemProps {
   icon: React.ElementType;
   label: string;
   value: string;
+  subValue?: string;
   href?: string;
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
-const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, label, value, href, onClick, className }) => {
+const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, label, value, subValue, href, onClick, className, disabled }) => {
   const itemContent = (
     <>
       <IconComponent className="h-5 w-5 mr-4 text-muted-foreground shrink-0" />
       <div className="flex-grow min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{label}</p>
-        {value && <p className="text-sm text-muted-foreground truncate">{value}</p>}
+        <p className={cn("text-sm font-medium text-foreground truncate", disabled && "opacity-50")}>{label}</p>
+        {value && <p className={cn("text-sm text-muted-foreground truncate", disabled && "opacity-50")}>{value}</p>}
+        {subValue && <p className={cn("text-xs text-muted-foreground/70 truncate", disabled && "opacity-50")}>{subValue}</p>}
       </div>
-      { (href || onClick) && <ChevronRight className="h-5 w-5 text-muted-foreground ml-2 shrink-0" /> }
+      { (href || onClick) && !disabled && <ChevronRight className="h-5 w-5 text-muted-foreground ml-2 shrink-0" /> }
     </>
   );
 
   const baseClasses = "flex items-center py-4 px-4 bg-card w-full text-left";
   const interactiveClasses = "hover:bg-muted/50 transition-colors";
+  const disabledClasses = "cursor-not-allowed opacity-70";
 
+  if (disabled) {
+    return <div className={cn(baseClasses, disabledClasses, className)}>{itemContent}</div>;
+  }
   if (href) {
     return <Link href={href} className={cn(baseClasses, interactiveClasses, className)}>{itemContent}</Link>;
   }
@@ -53,17 +62,19 @@ const SettingsListItem: React.FC<SettingsItemProps> = ({ icon: IconComponent, la
 
 
 export default function SettingsPage() {
-  const { user, loading, logout, updateUserName, updateUserBirthDate, updateUserGender, updateUserProfilePicture } = useAuth();
+  const { user, loading, logout, updateUserName, updateUserBirthDate, updateUserGender, updateUserProfilePicture, updateUserUsername } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isChangeNameDialogOpen, setIsChangeNameDialogOpen] = useState(false);
+  const [isChangeUsernameDialogOpen, setIsChangeUsernameDialogOpen] = useState(false); // State for username dialog
   const [isChangeBirthDateDialogOpen, setIsChangeBirthDateDialogOpen] = useState(false);
   const [isChangeGenderDialogOpen, setIsChangeGenderDialogOpen] = useState(false);
   const [currentBirthDate, setCurrentBirthDate] = useState('N/A');
   const [currentGender, setCurrentGender] = useState('N/A');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const [usernameChangeInfo, setUsernameChangeInfo] = useState<{ nextChangeAllowedIn?: string; lastChanged?: string; restricted: boolean }>({ restricted: false });
 
 
   useEffect(() => {
@@ -76,14 +87,36 @@ export default function SettingsPage() {
             const data = docSnap.data();
             setCurrentBirthDate(data?.birthDate || 'N/A');
             setCurrentGender(data?.gender || 'N/A');
+            
+            const lastChanged = data?.usernameLastChangedAt as Timestamp | null;
+            if (lastChanged) {
+              const lastChangedDate = lastChanged.toDate();
+              const thirtyDaysLater = new Date(lastChangedDate);
+              thirtyDaysLater.setDate(lastChangedDate.getDate() + 30);
+              const now = new Date();
+              if (now < thirtyDaysLater) {
+                setUsernameChangeInfo({
+                  lastChanged: `Changed ${formatDistanceToNowStrict(lastChangedDate, { addSuffix: true })}`,
+                  nextChangeAllowedIn: `Next change in ${formatDistanceToNowStrict(thirtyDaysLater, { addSuffix: false })}`,
+                  restricted: true,
+                });
+              } else {
+                 setUsernameChangeInfo({ lastChanged: `Changed ${formatDistanceToNowStrict(lastChangedDate, { addSuffix: true })}`, restricted: false });
+              }
+            } else {
+                setUsernameChangeInfo({ restricted: false, lastChanged: "Not changed recently" });
+            }
+
           } else {
             setCurrentBirthDate('N/A');
             setCurrentGender('N/A');
+            setUsernameChangeInfo({ restricted: false, lastChanged: "Not set" });
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
           setCurrentBirthDate('N/A');
           setCurrentGender('N/A');
+          setUsernameChangeInfo({ restricted: false, lastChanged: "Error loading data" });
         }
       }
     };
@@ -139,6 +172,14 @@ export default function SettingsPage() {
       value: user.displayName || 'N/A', 
       onClick: () => setIsChangeNameDialogOpen(true)
     }, 
+    { 
+      icon: AtSign, 
+      label: 'Username', 
+      value: user.username ? `@${user.username}` : 'Not set',
+      subValue: usernameChangeInfo.restricted ? usernameChangeInfo.nextChangeAllowedIn : usernameChangeInfo.lastChanged,
+      onClick: () => setIsChangeUsernameDialogOpen(true),
+      disabled: !user.username // Disable if initial username not set (should be forced by set-username page)
+    },
     { icon: Mail, label: 'Email', value: user.email || 'N/A' }, 
     { icon: Lock, label: 'Change Password', value: '••••••••••••', href: '/new-password' }, 
     { 
@@ -171,6 +212,39 @@ export default function SettingsPage() {
       });
     } else {
       throw new Error(result.error?.message || "Failed to update name. Please try again.");
+    }
+  };
+
+  const handleSaveUsername = async (newUsername: string) => {
+    const result = await updateUserUsername(newUsername);
+    if (result.success) {
+      toast({
+        title: "Username Updated",
+        description: `Your username is now @${newUsername}.`,
+        action: <CheckCircle className="h-5 w-5 text-green-500" />,
+      });
+      // Refetch username change info
+        const userDocRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            const lastChanged = data?.usernameLastChangedAt as Timestamp | null;
+             if (lastChanged) {
+              const lastChangedDate = lastChanged.toDate();
+              const thirtyDaysLater = new Date(lastChangedDate);
+              thirtyDaysLater.setDate(lastChangedDate.getDate() + 30);
+              setUsernameChangeInfo({
+                  lastChanged: `Changed ${formatDistanceToNowStrict(lastChangedDate, { addSuffix: true })}`,
+                  nextChangeAllowedIn: `Next change in ${formatDistanceToNowStrict(thirtyDaysLater, { addSuffix: false })}`,
+                  restricted: new Date() < thirtyDaysLater,
+                });
+            } else {
+                 setUsernameChangeInfo({ restricted: false, lastChanged: "Not changed recently" });
+            }
+        }
+    } else {
+      // Error with nextChangeDate will be handled by the dialog
+      throw new Error(result.error?.message || "Failed to update username.");
     }
   };
 
@@ -250,8 +324,10 @@ export default function SettingsPage() {
                 icon={item.icon}
                 label={item.label}
                 value={item.value}
+                subValue={item.subValue}
                 href={item.href}
                 onClick={item.onClick}
+                disabled={item.disabled}
               />
               {index < accountItems.length - 1 && <hr className="border-border ml-4" />}
             </React.Fragment>
@@ -304,6 +380,16 @@ export default function SettingsPage() {
         currentName={user.displayName || ''}
         onSave={handleSaveName}
       />
+
+      {user.username && ( // Only render if there's a username to change
+        <ChangeUsernameDialog
+          isOpen={isChangeUsernameDialogOpen}
+          onClose={() => setIsChangeUsernameDialogOpen(false)}
+          currentUsername={user.username}
+          usernameLastChangedAt={user.usernameLastChangedAt || null}
+          onSave={handleSaveUsername}
+        />
+      )}
       
       <ChangeBirthDateDialog
         isOpen={isChangeBirthDateDialogOpen}
