@@ -42,7 +42,7 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
         </button>
     );
   }
-  return <div className={cn("text-center", className)}>{content}</div>;
+  return <div className={cn("text-center", className)}>{itemContent}</div>;
 };
 
 // Helper function to generate a consistent chat ID
@@ -87,8 +87,8 @@ export default function UserProfilePage() {
             uid: userDocSnap.id,
             displayName: data.displayName || 'User',
             username: data.username || null, 
-            photoURL: data.photoURL || null, // Ensure null default
-            bio: data.bio || null, // Ensure null default
+            photoURL: data.photoURL || null,
+            bio: data.bio || null,
           });
 
           const allEvents = eventStore.getEvents();
@@ -188,13 +188,12 @@ export default function UserProfilePage() {
     }
 
     console.log("[handleMessage] Attempting to create/navigate to chat.");
-    console.log("[handleMessage] Current User UID:", currentUser.uid);
-    console.log("[handleMessage] Profile User UID:", profileUser.uid);
+    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid})`);
+    console.log(`[handleMessage] Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
     console.log("[handleMessage] Current User DisplayName:", currentUser.displayName);
     console.log("[handleMessage] Profile User DisplayName:", profileUser.displayName);
     console.log("[handleMessage] Current User Username:", currentUser.username);
     console.log("[handleMessage] Profile User Username:", profileUser.username);
-
 
     const chatId = getChatId(currentUser.uid, profileUser.uid);
     const chatDocRef = doc(db, 'chats', chatId);
@@ -212,8 +211,13 @@ export default function UserProfilePage() {
         username: profileUser.username || null
     };
 
+    const participantsArray = [currentUser.uid, profileUser.uid];
+    console.log("[handleMessage] Participants array BEFORE sort:", participantsArray);
+    const sortedParticipantsArray = [...participantsArray].sort();
+    console.log("[handleMessage] Participants array AFTER sort:", sortedParticipantsArray);
+
     const chatDataToWrite = {
-        participants: [currentUser.uid, profileUser.uid].sort(),
+        participants: sortedParticipantsArray,
         participantDetails: {
             [currentUser.uid]: currentUserDetails,
             [profileUser.uid]: profileUserDetails,
@@ -226,12 +230,8 @@ export default function UserProfilePage() {
         }
     };
     
-    console.log("[handleMessage] Data to write to Firestore for new chat:", JSON.stringify(chatDataToWrite, (key, value) => {
-      // Firestore serverTimestamp() objects don't stringify well, so replace them for logging
-      if (value && typeof value === 'object' && value.hasOwnProperty('nanoseconds') && value.hasOwnProperty('seconds')) {
-        return `Timestamp(seconds=${value.seconds}, nanoseconds=${value.nanoseconds})`;
-      }
-      if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
+    console.log("[handleMessage] Data to write to Firestore for new chat (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
+      if (key === 'updatedAt' && value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
         return `ServerTimestampPlaceholder`;
       }
       return value;
@@ -241,18 +241,19 @@ export default function UserProfilePage() {
         const chatDocSnap = await getDoc(chatDocRef);
         if (!chatDocSnap.exists()) {
             await setDoc(chatDocRef, chatDataToWrite);
-            console.log("[handleMessage] Created new chat document:", chatId);
+            console.log("[handleMessage] Created new chat document with ID:", chatId);
+        } else {
+            console.log("[handleMessage] Chat document already exists with ID:", chatId);
         }
         router.push(`/messages/${chatId}`);
     } catch (error) {
         console.error("[handleMessage] Error ensuring chat exists or navigating:", error);
-        // Check if error is a FirebaseError and has a code
         if (error instanceof Error && 'code' in error) {
             const firebaseError = error as {code: string, message: string};
             console.error("[handleMessage] Firebase Error Code:", firebaseError.code);
             console.error("[handleMessage] Firebase Error Message:", firebaseError.message);
         }
-        toast({ title: "Error", description: "Could not start conversation. Check console for details.", variant: "destructive" });
+        toast({ title: "Error Starting Conversation", description: "Could not start conversation. Check console for details.", variant: "destructive" });
     }
   };
 
@@ -406,7 +407,5 @@ export default function UserProfilePage() {
     </motion.div>
   );
 }
-
-  
 
     
