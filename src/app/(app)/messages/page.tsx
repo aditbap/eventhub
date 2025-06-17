@@ -14,7 +14,7 @@ import type { Chat, ChatParticipant } from '@/types';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useToast } from '@/hooks/use-toast'; 
 
 interface ChatItemProps {
   chat: Chat;
@@ -98,15 +98,18 @@ export default function MessagesPage() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loadingChats, setLoadingChats] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast(); // Initialize useToast
+  const { toast } = useToast(); 
 
   useEffect(() => {
-    if (!currentUser) {
-      if (!authLoading) router.replace('/login');
+    if (authLoading) return; // Wait for auth state to resolve
+
+    if (!currentUser || !currentUser.uid) { // Explicitly check for user and uid
+      router.replace('/login');
       return;
     }
 
     setLoadingChats(true);
+    console.log(`[MessagesPage] Current user UID: ${currentUser.uid}. Setting up Firestore listener for chats.`);
     const chatsRef = collection(db, 'chats');
     const q = query(
       chatsRef,
@@ -121,28 +124,31 @@ export default function MessagesPage() {
       });
       setChats(fetchedChats);
       setLoadingChats(false);
+      console.log(`[MessagesPage] Successfully fetched ${fetchedChats.length} chats.`);
     }, (error) => {
-      console.error("Error fetching chats (onSnapshot):", error);
-      // More detailed logging for permission issues
-      if (error.code === 'permission-denied' || (error as any).code === 'failed-precondition') { // 'failed-precondition' can indicate missing index
-        console.error("Firestore permission error or missing index. Please check your Firestore rules and ensure the necessary composite index exists for 'chats' collection (participants array-contains, updatedAt desc).");
+      console.error("[MessagesPage] Error fetching chats (onSnapshot):", error);
+      if (error.code === 'permission-denied' || (error as any).code === 'failed-precondition') {
+        console.error("[MessagesPage] Firestore permission error or missing index. Please check your Firestore rules and ensure the necessary composite index exists for 'chats' collection (participants array-contains ASC, updatedAt DESC).");
         toast({
             title: "Error Loading Chats",
-            description: "Could not load your conversations. This might be due to a permission issue or a missing database index. Please ensure you have the correct Firestore index: `chats` collection, fields `participants` (Array, Ascending) and `updatedAt` (Timestamp, Descending).",
+            description: "Could not load your conversations. This might be a permission issue or a missing database index. Ensure Firestore index: `chats` (participants Array ASC, updatedAt Timestamp DESC) exists.",
             variant: "destructive",
-            duration: 10000, // Show longer
+            duration: 15000, 
         });
       } else {
          toast({
             title: "Error Loading Chats",
-            description: "An unexpected error occurred while loading your conversations.",
+            description: `An unexpected error occurred: ${error.message}`,
             variant: "destructive",
         });
       }
       setLoadingChats(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("[MessagesPage] Unsubscribing from Firestore chats listener.");
+      unsubscribe();
+    };
   }, [currentUser, authLoading, router, toast]);
 
   const filteredChats = chats.filter(chat => {
@@ -155,6 +161,15 @@ export default function MessagesPage() {
     return (otherParticipant.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
            (otherParticipant.username || '').toLowerCase().includes(searchTerm.toLowerCase());
   });
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-2 text-muted-foreground">Loading authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -185,8 +200,9 @@ export default function MessagesPage() {
         </div>
         
         {loadingChats ? (
-          <div className="flex justify-center items-center py-10">
+          <div className="flex flex-col justify-center items-center py-10">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-2 text-muted-foreground">Loading chats...</p>
           </div>
         ) : filteredChats.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground bg-card rounded-lg shadow-sm mt-6">
@@ -209,3 +225,4 @@ export default function MessagesPage() {
     </motion.div>
   );
 }
+
