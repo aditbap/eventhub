@@ -186,7 +186,7 @@ export default function MessagesPage() {
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-foreground hover:bg-muted/20 rounded-full">
           <ArrowLeft className="h-6 w-6" />
         </Button>
-        <h1 className="text-lg font-headline font-semibold text-foreground">Messages</h1>
+        <h1 className="text-lg font-headline font-semibold text-foreground">Inbox</h1>
         <Button variant="ghost" size="icon" onClick={() => router.push('/social')} className="text-foreground hover:bg-muted/20 rounded-full" aria-label="Search users to message">
           <Search className="h-6 w-6" />
         </Button>
@@ -229,5 +229,7 @@ export default function MessagesPage() {
     </motion.div>
   );
 }
+
+    
 
     
