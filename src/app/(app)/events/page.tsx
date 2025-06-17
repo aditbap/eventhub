@@ -75,7 +75,7 @@ function EventsPageContent() {
       const eventsColRef = collection(db, 'events');
       // Query upcoming or current events by default, ordered by date
       const todayStr = format(startOfDay(new Date()), 'yyyy-MM-dd');
-      const q = firestoreQuery(
+      const q = query( // Changed firestoreQuery to query
         eventsColRef, 
         where('date', '>=', todayStr), 
         orderBy('date', 'asc'), 
