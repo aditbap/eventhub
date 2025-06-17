@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import type { Event, Notification, PublicUserProfile, ChatParticipant } from '@/types'; // Added ChatParticipant
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, setDoc } from 'firebase/firestore'; // Added setDoc
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, setDoc, Timestamp } from 'firebase/firestore'; // Added setDoc and Timestamp
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,10 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
 
 // Helper function to generate a consistent chat ID
 const getChatId = (uid1: string, uid2: string): string => {
+  if (!uid1 || !uid2 || typeof uid1 !== 'string' || typeof uid2 !== 'string') {
+    console.error("[getChatId] Critical error: UIDs must be valid strings. Received:", uid1, uid2);
+    throw new Error("Cannot generate chat ID: UIDs are invalid.");
+  }
   return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
 };
 
@@ -182,48 +186,83 @@ export default function UserProfilePage() {
   };
   
   const handleMessage = async () => {
-    if (!currentUser || !profileUser || currentUser.uid === profileUser.uid) {
-      if (!currentUser) toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
+    console.log("[handleMessage] Initiating message attempt...");
+
+    if (!currentUser) {
+      console.error("[handleMessage] Critical: currentUser is null. User not logged in.");
+      toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
+      return;
+    }
+    if (!profileUser) {
+      console.error("[handleMessage] Critical: profileUser is null. Cannot message this user.");
+      toast({ title: "User Not Found", description: "Cannot find user to message.", variant: "destructive" });
+      return;
+    }
+     if (!currentUser.uid || typeof currentUser.uid !== 'string') {
+      console.error("[handleMessage] Critical: currentUser.uid is invalid:", currentUser.uid);
+      toast({ title: "Error", description: "Your user ID is invalid. Please re-login.", variant: "destructive" });
+      return;
+    }
+    if (!profileUser.uid || typeof profileUser.uid !== 'string') {
+      console.error("[handleMessage] Critical: profileUser.uid is invalid:", profileUser.uid);
+      toast({ title: "Error", description: "Target user ID is invalid.", variant: "destructive" });
+      return;
+    }
+    if (currentUser.uid === profileUser.uid) {
+      console.warn("[handleMessage] User attempting to message themselves.");
+      toast({ title: "Cannot Message Yourself", description: "You cannot start a conversation with yourself.", variant: "default" });
       return;
     }
 
-    console.log("[handleMessage] Attempting to create/navigate to chat.");
     console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid})`);
     console.log(`[handleMessage] Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
-    console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username}`);
-    console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username}`);
-
+    console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username || 'N/A'}`);
+    console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username || 'N/A'}`);
 
     const chatId = getChatId(currentUser.uid, profileUser.uid);
+    console.log("[handleMessage] Generated Chat ID:", chatId);
+    if (!chatId || typeof chatId !== 'string' || chatId.split('_').length !== 2) {
+        console.error("[handleMessage] Critical: Generated chatId is invalid:", chatId);
+        toast({ title: "Error", description: "Could not generate a valid chat ID.", variant: "destructive" });
+        return;
+    }
+
     const chatDocRef = doc(db, 'chats', chatId);
     
     const currentUserDetails: ChatParticipant = {
         uid: currentUser.uid,
-        displayName: currentUser.displayName || 'User',
+        displayName: currentUser.displayName || null,
         photoURL: currentUser.photoURL || null,
         username: currentUser.username || null
     };
     const profileUserDetails: ChatParticipant = {
         uid: profileUser.uid,
-        displayName: profileUser.displayName || 'User',
+        displayName: profileUser.displayName || null,
         photoURL: profileUser.photoURL || null,
         username: profileUser.username || null
     };
 
     const participantsArray = [currentUser.uid, profileUser.uid];
-    console.log("[handleMessage] Participants array BEFORE sort:", participantsArray);
     const sortedParticipantsArray = [...participantsArray].sort();
+
+    console.log("[handleMessage] Participants array (unsorted):", participantsArray);
+    console.log("[handleMessage] Sorted participants array:", sortedParticipantsArray);
+    console.log("[handleMessage] Verifying sortedParticipantsArray content - UID1 type:", typeof sortedParticipantsArray[0], "UID2 type:", typeof sortedParticipantsArray[1]);
+    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string') {
+        console.error("[handleMessage] Critical: sortedParticipantsArray is malformed:", sortedParticipantsArray);
+        toast({ title: "Error", description: "Failed to prepare participant list for chat.", variant: "destructive" });
+        return;
+    }
     
-    // --- DETAILED LOGS FOR SECURITY RULE DEBUGGING ---
-    console.log("--- Firestore `allow create` rule for /chats/{chatId} ---");
+    console.log("--- Firestore `allow create` rule for /chats/{chatId} PRE-CHECK ---");
     console.log("Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;");
-    console.log("--- Comparing with data to be written ---");
-    console.log(`1. request.auth != null: ${currentUser ? 'true (user logged in)' : 'false (user not logged in)'}`);
-    console.log(`2. request.auth.uid: ${currentUser?.uid}`);
+    console.log("--- Client-side data for comparison ---");
+    console.log(`1. request.auth != null (client assumes): ${currentUser ? 'true' : 'false'}`);
+    console.log(`2. request.auth.uid (client-side perspective):`, currentUser?.uid);
     console.log(`   request.resource.data.participants (to be written):`, sortedParticipantsArray);
-    console.log(`   Is request.auth.uid in request.resource.data.participants? : ${currentUser ? sortedParticipantsArray.includes(currentUser.uid) : 'N/A (no auth user)'}`);
+    console.log(`   Is currentUser.uid in sortedParticipantsArray?: ${currentUser ? sortedParticipantsArray.includes(currentUser.uid) : 'N/A'}`);
     console.log(`3. request.resource.data.participants.size() (to be written): ${sortedParticipantsArray.length}`);
-    console.log("--- End of security rule comparison data ---");
+    console.log("--- End of client-side pre-check ---");
 
 
     const chatDataToWrite = {
@@ -232,7 +271,7 @@ export default function UserProfilePage() {
             [currentUser.uid]: currentUserDetails,
             [profileUser.uid]: profileUserDetails,
         },
-        updatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(), // Firestore Server Timestamp
         lastMessage: null, 
         unreadCounts: {
             [currentUser.uid]: 0,
@@ -242,29 +281,28 @@ export default function UserProfilePage() {
     
     console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
       if (key === 'updatedAt' && value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
-        return `ServerTimestampPlaceholder`;
+        return `Firestore.ServerTimestamp`; // Placeholder for logging
       }
       return value;
     }, 2));
 
-
     try {
         const chatDocSnap = await getDoc(chatDocRef);
         if (!chatDocSnap.exists()) {
+            console.log("[handleMessage] Chat document does not exist. Attempting to create with ID:", chatId);
             await setDoc(chatDocRef, chatDataToWrite);
-            console.log("[handleMessage] Created new chat document with ID:", chatId);
+            console.log("[handleMessage] Successfully created new chat document with ID:", chatId);
         } else {
-            console.log("[handleMessage] Chat document already exists with ID:", chatId);
+            console.log("[handleMessage] Chat document already exists with ID:", chatId, "No new document created.");
         }
         router.push(`/messages/${chatId}`);
-    } catch (error) {
+    } catch (error: any) {
         console.error("[handleMessage] Error ensuring chat exists or navigating:", error);
-        if (error instanceof Error && 'code' in error) {
-            const firebaseError = error as {code: string, message: string};
-            console.error("[handleMessage] Firebase Error Code:", firebaseError.code);
-            console.error("[handleMessage] Firebase Error Message:", firebaseError.message);
+        if (error.code) {
+            console.error("[handleMessage] Firebase Error Code:", error.code);
         }
-        toast({ title: "Error Starting Conversation", description: "Could not start conversation. Check console for details.", variant: "destructive" });
+        console.error("[handleMessage] Firebase Error Message:", error.message);
+        toast({ title: "Error Starting Conversation", description: `Could not start conversation: ${error.message || 'Unknown error.'}`, variant: "destructive" });
     }
   };
 
