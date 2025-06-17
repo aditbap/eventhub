@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 // import { db } from '@/lib/firebase';
 // import { doc, getDoc, collection, onSnapshot, query, orderBy, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils'; // Added missing import
 
 // Placeholder data - replace with actual message fetching and sending logic
 export default function ChatPage() {
