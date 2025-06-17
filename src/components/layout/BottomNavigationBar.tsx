@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, CalendarDays, Plus, UserCircle, Users, MessageSquare, type Icon } from 'lucide-react';
+import { Compass, CalendarDays, Plus, UserCircle, Users, type Icon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -18,7 +18,6 @@ const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
-  { href: '/messages', label: 'Messages', icon: MessageSquare, isDisabled: false },
   { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
@@ -76,3 +75,4 @@ export function BottomNavigationBar() {
     </nav>
   );
 }
+

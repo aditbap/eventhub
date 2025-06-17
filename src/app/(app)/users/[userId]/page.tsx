@@ -5,13 +5,13 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import type { Event, Notification, PublicUserProfile, ChatParticipant } from '@/types'; // Added ChatParticipant
+import type { Event, Notification, PublicUserProfile } from '@/types';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, setDoc, Timestamp } from 'firebase/firestore'; // Added setDoc and Timestamp
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, MessageSquare, AtSign } from 'lucide-react';
+import { ArrowLeft, UserPlus, UserCheck, Loader2, CalendarDays, AtSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AllEventsEventItem } from '@/components/events/AllEventsEventItem';
 import { useToast } from '@/hooks/use-toast';
@@ -45,14 +45,6 @@ const StatItem: React.FC<StatItemProps> = ({ value, label, onClick, className })
   return <div className={cn("text-center", className)}>{content}</div>;
 };
 
-// Helper function to generate a consistent chat ID
-const getChatId = (uid1: string, uid2: string): string => {
-  if (!uid1 || !uid2 || typeof uid1 !== 'string' || typeof uid2 !== 'string') {
-    console.error("[getChatId] Critical error: UIDs must be valid strings. Received:", uid1, uid2);
-    throw new Error("Cannot generate chat ID: UIDs are invalid.");
-  }
-  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
-};
 
 export default function UserProfilePage() {
   const params = useParams();
@@ -185,138 +177,6 @@ export default function UserProfilePage() {
     }
   };
   
-  const handleMessage = async () => {
-    console.log("[handleMessage] Initiating message attempt...");
-
-    if (!currentUser) {
-      console.error("[handleMessage] Critical validation failed: currentUser is null. User not logged in.");
-      toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
-      return;
-    }
-    if (!profileUser) {
-      console.error("[handleMessage] Critical validation failed: profileUser is null. Cannot message this user.");
-      toast({ title: "User Not Found", description: "Cannot find user to message.", variant: "destructive" });
-      return;
-    }
-     if (!currentUser.uid || typeof currentUser.uid !== 'string' || currentUser.uid.trim() === '') {
-      console.error("[handleMessage] Critical validation failed: currentUser.uid is invalid:", currentUser.uid);
-      toast({ title: "Error", description: "Your user ID is invalid. Please re-login.", variant: "destructive" });
-      return;
-    }
-    if (!profileUser.uid || typeof profileUser.uid !== 'string' || profileUser.uid.trim() === '') {
-      console.error("[handleMessage] Critical validation failed: profileUser.uid is invalid:", profileUser.uid);
-      toast({ title: "Error", description: "Target user ID is invalid.", variant: "destructive" });
-      return;
-    }
-    if (currentUser.uid === profileUser.uid) {
-      console.warn("[handleMessage] User attempting to message themselves.");
-      toast({ title: "Cannot Message Yourself", description: "You cannot start a conversation with yourself.", variant: "default" });
-      return;
-    }
-
-    console.log(`[handleMessage] Current User UID: '${currentUser.uid}' (Type: ${typeof currentUser.uid})`);
-    console.log(`[handleMessage] Profile User UID: '${profileUser.uid}' (Type: ${typeof profileUser.uid})`);
-    console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username || 'N/A'}`);
-    console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username || 'N/A'}`);
-
-    const chatId = getChatId(currentUser.uid, profileUser.uid);
-    console.log("[handleMessage] Generated Chat ID:", chatId);
-    if (!chatId || typeof chatId !== 'string' || chatId.split('_').length !== 2) {
-        console.error("[handleMessage] Critical validation failed: Generated chatId is invalid:", chatId);
-        toast({ title: "Error", description: "Could not generate a valid chat ID.", variant: "destructive" });
-        return;
-    }
-
-    const chatDocRef = doc(db, 'chats', chatId);
-    
-    // Explicitly use the UIDs that will form the participants array for participantDetails keys
-    const uid1 = currentUser.uid;
-    const uid2 = profileUser.uid;
-
-    const currentUserDetails: ChatParticipant = {
-        uid: uid1,
-        displayName: currentUser.displayName || null,
-        photoURL: currentUser.photoURL || null,
-        username: currentUser.username || null
-    };
-    const profileUserDetails: ChatParticipant = {
-        uid: uid2,
-        displayName: profileUser.displayName || null,
-        photoURL: profileUser.photoURL || null,
-        username: profileUser.username || null
-    };
-
-    const participantsArray = [uid1, uid2];
-    const sortedParticipantsArray = [...participantsArray].sort();
-
-    console.log("[handleMessage] Participants array (unsorted):", participantsArray);
-    console.log("[handleMessage] Sorted participants array:", sortedParticipantsArray);
-
-    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string' || sortedParticipantsArray[0].trim() === '' || sortedParticipantsArray[1].trim() === '') {
-        console.error("[handleMessage] Critical validation failed: sortedParticipantsArray is malformed or contains invalid UIDs:", sortedParticipantsArray);
-        toast({ title: "Error", description: "Failed to prepare participant list for chat due to invalid UIDs.", variant: "destructive" });
-        return;
-    }
-    if (sortedParticipantsArray[0] === sortedParticipantsArray[1]) {
-        console.error("[handleMessage] Critical validation failed: sortedParticipantsArray contains duplicate UIDs:", sortedParticipantsArray);
-        toast({ title: "Error", description: "Cannot create chat with duplicate participants.", variant: "destructive" });
-        return;
-    }
-    
-    console.log("--- Firestore `allow create` rule for /chats/{chatId} PRE-CHECK ---");
-    console.log("Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;");
-    console.log("--- Client-side data for comparison ---");
-    console.log(`1. request.auth != null (client assumes): ${currentUser ? 'true' : 'false'}`);
-    console.log(`2. request.auth.uid (client-side perspective): '${currentUser?.uid}'`);
-    console.log(`   request.resource.data.participants (to be written): ['${sortedParticipantsArray[0]}', '${sortedParticipantsArray[1]}']`);
-    const isAuthUidInParticipants = currentUser ? sortedParticipantsArray.includes(currentUser.uid) : false;
-    console.log(`   Is currentUser.uid in sortedParticipantsArray?: ${isAuthUidInParticipants}`);
-    console.log(`3. request.resource.data.participants.size() (to be written): ${sortedParticipantsArray.length}`);
-    console.log("--- End of client-side pre-check ---");
-
-    const chatDataToWrite = {
-        participants: sortedParticipantsArray, // Ensure this is what's written
-        participantDetails: {
-            [uid1]: currentUserDetails, // Use the exact UIDs
-            [uid2]: profileUserDetails
-        },
-        updatedAt: serverTimestamp(), 
-        lastMessage: null, 
-        unreadCounts: {
-            [uid1]: 0,
-            [uid2]: 0,
-        }
-    };
-    
-    console.log("[handleMessage] Final `participants` array in chatDataToWrite:", chatDataToWrite.participants);
-    console.log("[handleMessage] Keys in `participantDetails`:", Object.keys(chatDataToWrite.participantDetails));
-    console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
-      if (key === 'updatedAt' && value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
-        return `Firestore.ServerTimestamp`; 
-      }
-      return value;
-    }, 2));
-
-    try {
-        const chatDocSnap = await getDoc(chatDocRef);
-        if (!chatDocSnap.exists()) {
-            console.log("[handleMessage] Chat document does not exist. Attempting to create with ID:", chatId);
-            await setDoc(chatDocRef, chatDataToWrite);
-            console.log("[handleMessage] Successfully created new chat document with ID:", chatId);
-        } else {
-            console.log("[handleMessage] Chat document already exists with ID:", chatId, "No new document created.");
-        }
-        router.push(`/messages/${chatId}`);
-    } catch (error: any) {
-        console.error("[handleMessage] Error ensuring chat exists or navigating:", error);
-        if (error.code) {
-            console.error("[handleMessage] Firebase Error Code:", error.code);
-        }
-        console.error("[handleMessage] Firebase Error Message:", error.message);
-        toast({ title: "Error Starting Conversation", description: `Could not start conversation: ${error.message || 'Unknown error.'}`, variant: "destructive" });
-    }
-  };
-
   const isCurrentUserProfile = useMemo(() => currentUser?.uid === userId, [currentUser, userId]);
 
   if (loadingProfile || currentUserLoading) {
@@ -403,9 +263,6 @@ export default function UserProfilePage() {
                 >
                   {loadingFollowStatus || followActionInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (isFollowing ? <UserCheck className="mr-2 h-5 w-5"/> : <UserPlus className="mr-2 h-5 w-5"/>)}
                   {loadingFollowStatus ? 'Checking...' : (followActionInProgress ? (isFollowing ? 'Unfollowing...' : 'Following...') : (isFollowing ? 'Following' : 'Follow'))}
-                </Button>
-                <Button variant="outline" className="flex-1 h-11 text-base font-semibold" onClick={handleMessage}> 
-                    <MessageSquare className="mr-2 h-5 w-5"/> Message
                 </Button>
             </div>
           )}
