@@ -87,8 +87,8 @@ export default function UserProfilePage() {
             uid: userDocSnap.id,
             displayName: data.displayName || 'User',
             username: data.username || null, 
-            photoURL: data.photoURL || undefined,
-            bio: data.bio || undefined,
+            photoURL: data.photoURL || null, // Ensure null default
+            bio: data.bio || null, // Ensure null default
           });
 
           const allEvents = eventStore.getEvents();
@@ -186,45 +186,73 @@ export default function UserProfilePage() {
       if (!currentUser) toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
       return;
     }
+
+    console.log("[handleMessage] Attempting to create/navigate to chat.");
+    console.log("[handleMessage] Current User UID:", currentUser.uid);
+    console.log("[handleMessage] Profile User UID:", profileUser.uid);
+    console.log("[handleMessage] Current User DisplayName:", currentUser.displayName);
+    console.log("[handleMessage] Profile User DisplayName:", profileUser.displayName);
+    console.log("[handleMessage] Current User Username:", currentUser.username);
+    console.log("[handleMessage] Profile User Username:", profileUser.username);
+
+
     const chatId = getChatId(currentUser.uid, profileUser.uid);
     const chatDocRef = doc(db, 'chats', chatId);
     
+    const currentUserDetails: ChatParticipant = {
+        uid: currentUser.uid,
+        displayName: currentUser.displayName || 'User',
+        photoURL: currentUser.photoURL || null,
+        username: currentUser.username || null
+    };
+    const profileUserDetails: ChatParticipant = {
+        uid: profileUser.uid,
+        displayName: profileUser.displayName || 'User',
+        photoURL: profileUser.photoURL || null,
+        username: profileUser.username || null
+    };
+
+    const chatDataToWrite = {
+        participants: [currentUser.uid, profileUser.uid].sort(),
+        participantDetails: {
+            [currentUser.uid]: currentUserDetails,
+            [profileUser.uid]: profileUserDetails,
+        },
+        updatedAt: serverTimestamp(),
+        lastMessage: null, 
+        unreadCounts: {
+            [currentUser.uid]: 0,
+            [profileUser.uid]: 0,
+        }
+    };
+    
+    console.log("[handleMessage] Data to write to Firestore for new chat:", JSON.stringify(chatDataToWrite, (key, value) => {
+      // Firestore serverTimestamp() objects don't stringify well, so replace them for logging
+      if (value && typeof value === 'object' && value.hasOwnProperty('nanoseconds') && value.hasOwnProperty('seconds')) {
+        return `Timestamp(seconds=${value.seconds}, nanoseconds=${value.nanoseconds})`;
+      }
+      if (value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
+        return `ServerTimestampPlaceholder`;
+      }
+      return value;
+    }, 2));
+
     try {
         const chatDocSnap = await getDoc(chatDocRef);
         if (!chatDocSnap.exists()) {
-            // Chat doesn't exist, create it before navigating
-            const currentUserDetails: ChatParticipant = {
-                uid: currentUser.uid,
-                displayName: currentUser.displayName || 'User', // Fallback
-                photoURL: currentUser.photoURL || null,        // Fallback to null
-                username: currentUser.username || null         // Fallback to null
-            };
-            const profileUserDetails: ChatParticipant = {
-                uid: profileUser.uid,
-                displayName: profileUser.displayName || 'User', // Fallback
-                photoURL: profileUser.photoURL || null,        // Fallback to null
-                username: profileUser.username || null         // Fallback to null
-            };
-
-            await setDoc(chatDocRef, {
-                participants: [currentUser.uid, profileUser.uid].sort(),
-                participantDetails: {
-                    [currentUser.uid]: currentUserDetails,
-                    [profileUser.uid]: profileUserDetails,
-                },
-                updatedAt: serverTimestamp(),
-                lastMessage: null, 
-                unreadCounts: {
-                    [currentUser.uid]: 0,
-                    [profileUser.uid]: 0,
-                }
-            });
-            console.log("Created new chat document:", chatId);
+            await setDoc(chatDocRef, chatDataToWrite);
+            console.log("[handleMessage] Created new chat document:", chatId);
         }
         router.push(`/messages/${chatId}`);
     } catch (error) {
-        console.error("Error ensuring chat exists or navigating:", error);
-        toast({ title: "Error", description: "Could not start conversation.", variant: "destructive" });
+        console.error("[handleMessage] Error ensuring chat exists or navigating:", error);
+        // Check if error is a FirebaseError and has a code
+        if (error instanceof Error && 'code' in error) {
+            const firebaseError = error as {code: string, message: string};
+            console.error("[handleMessage] Firebase Error Code:", firebaseError.code);
+            console.error("[handleMessage] Firebase Error Message:", firebaseError.message);
+        }
+        toast({ title: "Error", description: "Could not start conversation. Check console for details.", variant: "destructive" });
     }
   };
 
@@ -380,3 +408,5 @@ export default function UserProfilePage() {
 }
 
   
+
+    
