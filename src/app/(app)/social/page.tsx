@@ -8,7 +8,7 @@ import { ArrowLeft, Search, Users, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit, orderBy, startAt, endAt, or } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, startAt, endAt } from 'firebase/firestore';
 import type { PublicUserProfile } from '@/types';
 import { UserListItem } from '@/components/profile/UserListItem';
 import { motion } from 'framer-motion';
@@ -26,7 +26,7 @@ export default function SocialPage() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
       setSearchResults([]);
-      setHasSearched(true);
+      setHasSearched(true); // Considered a search, even if empty query leading to no results shown
       return;
     }
 
@@ -36,12 +36,12 @@ export default function SocialPage() {
       const usersRef = collection(db, 'users');
       const normalizedQuery = trimmedQuery.toLowerCase(); // For username search
 
-      // Query for display name (case-insensitive prefix - harder in Firestore directly without 3rd party)
+      // Query for display name (case-insensitive prefix - harder in Firestore directly)
       // We'll do a "starts with" for display name, and exact match for lowercase username
       const displayNameQuery = query(
         usersRef,
         orderBy('displayName'),
-        startAt(trimmedQuery),
+        startAt(trimmedQuery), // Case-sensitive start for display name
         endAt(trimmedQuery + '\uf8ff'),
         limit(10)
       );
@@ -49,7 +49,7 @@ export default function SocialPage() {
       // Query for username (exact match, case-insensitive by searching lowercase)
       const usernameQuery = query(
         usersRef,
-        where('username', '==', normalizedQuery),
+        where('username', '==', normalizedQuery), // Assumes username in Firestore is lowercase
         limit(10)
       );
       
@@ -62,7 +62,7 @@ export default function SocialPage() {
 
       displayNameSnap.forEach((doc) => {
         const data = doc.data();
-        if (doc.id !== currentUser?.uid) {
+        if (doc.id !== currentUser?.uid) { // Exclude current user
           usersMap.set(doc.id, {
             uid: doc.id,
             displayName: data.displayName || 'User',
@@ -75,7 +75,7 @@ export default function SocialPage() {
 
       usernameSnap.forEach((doc) => {
         const data = doc.data();
-        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { // Avoid duplicates
+        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { // Exclude current user and avoid duplicates
           usersMap.set(doc.id, {
             uid: doc.id,
             displayName: data.displayName || 'User',
@@ -91,14 +91,17 @@ export default function SocialPage() {
     } catch (error) {
       console.error("Error searching users:", error);
       setSearchResults([]);
+      // Optionally, set an error state to show a message to the user
     } finally {
       setIsLoadingSearch(false);
     }
   };
   
+  // Clear results if search query is cleared after a search has been made
   useEffect(() => {
     if (searchQuery.trim() === '' && hasSearched && !isLoadingSearch) {
         setSearchResults([]);
+        // setHasSearched(false); // Optionally reset hasSearched if you want the initial prompt back
     }
   }, [searchQuery, hasSearched, isLoadingSearch]);
 
@@ -130,9 +133,9 @@ export default function SocialPage() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (e.target.value.trim() === '') { 
+              if (e.target.value.trim() === '') { // If input is cleared, reset search state
                 setSearchResults([]);
-                setHasSearched(false);
+                setHasSearched(false); // Allow initial prompt to show again
               }
             }}
           />
@@ -153,7 +156,8 @@ export default function SocialPage() {
                 key={user.uid} 
                 profileUser={user} 
                 currentUserUid={currentUser?.uid}
-                showFollowButton={!!currentUser && user.uid !== currentUser.uid}
+                onFollowStateChange={() => { /* Optionally refetch or update counts */ }}
+                showFollowButton={!!currentUser && user.uid !== currentUser.uid} // Show follow button if not the current user
               />
             ))}
           </div>
@@ -166,6 +170,7 @@ export default function SocialPage() {
             </p>
           </div>
         ) : (
+            // Initial state: prompt to search
             <div className="text-center py-10 bg-card rounded-xl shadow-sm">
                 <Users className="h-16 w-16 mx-auto text-primary/30 mb-4" strokeWidth={1.5}/>
                 <p className="text-xl font-semibold text-muted-foreground">Find People</p>
@@ -178,3 +183,4 @@ export default function SocialPage() {
     </motion.div>
   );
 }
+
