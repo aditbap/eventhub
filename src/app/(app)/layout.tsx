@@ -17,21 +17,7 @@ export default function AppLayout({
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        // If not loading and no user, redirect to login, unless already on an auth page
-        // This primarily handles cases where a user tries to access an app page directly without being logged in.
-        // The more comprehensive redirect logic (including for username) is in AuthContext.
-        if (pathname !== '/login' && pathname !== '/register' && pathname !== '/reset-password' && pathname !== '/set-username') {
-            router.replace('/login');
-        }
-      } else if (user && !user.username && pathname !== '/set-username') {
-        // If user is logged in but has no username, and not already on set-username page, redirect.
-        router.replace('/set-username');
-      }
-    }
-  }, [user, loading, router, pathname]);
+  // Removed redundant useEffect for redirection as AuthContext now handles it.
 
   // Show loader if auth is loading OR if user exists but username is missing (and not on set-username page)
   // This prevents content flash before redirect to /set-username
@@ -44,8 +30,8 @@ export default function AppLayout({
   }
   
   // If after loading, there's no user, and we're not on an auth page (which AppLayout doesn't cover),
-  // it means the user tried to access an app page directly. The useEffect above should have redirected.
-  // However, to prevent rendering children if redirection is in flight or hasn't happened yet for some reason:
+  // it means the user tried to access an app page directly. AuthContext should have redirected.
+  // To prevent rendering children if redirection is in flight or hasn't happened:
   if (!user) {
      return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -67,3 +53,4 @@ export default function AppLayout({
     </>
   );
 }
+

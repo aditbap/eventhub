@@ -25,7 +25,7 @@ export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  username: string | null; // Changed to non-optional, will be enforced
+  username: string | null; 
   photoURL?: string | null;
   bio?: string | null; 
 }
@@ -64,13 +64,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           userBio = data?.bio || null;
-          username = data?.username || null; // This can be null if old user or new Google sign-in
+          username = data?.username || null; 
         }
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          username: username, // Keep it potentially null here, AppLayout will handle redirect
+          username: username, 
           photoURL: firebaseUser.photoURL,
           bio: userBio,
         });
@@ -191,17 +191,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!userDoc.exists()) {
           googleUserData.createdAt = serverTimestamp();
           googleUserData.bio = null; 
-          googleUserData.username = null; // New Google users won't have a username yet
+          googleUserData.username = null; 
           await setDoc(userDocRef, googleUserData);
           userBio = null;
         } else {
            const existingData = userDoc.data();
            userBio = existingData?.bio || null;
-           username = existingData?.username || null; // Preserve existing username if any
+           username = existingData?.username || null; 
            await updateDoc(userDocRef, { 
             displayName: firebaseUser.displayName || existingData?.displayName || null,
             photoURL: firebaseUser.photoURL || existingData?.photoURL || null,
-            username: username, // Keep username as is from DB
+            username: username, 
             updatedAt: serverTimestamp(),
           });
         }
@@ -209,7 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          username: username, // This could be null
+          username: username, 
           photoURL: firebaseUser.photoURL,
           bio: userBio,
         });
@@ -270,7 +270,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updatedAt: serverTimestamp()
       };
       
-      await updateDoc(userDocRef, firestoreData); // Assumes doc exists for logged-in user
+      await updateDoc(userDocRef, firestoreData); 
       await authUpdatePromise;
 
       setUser(prevUser => prevUser ? { ...prevUser, displayName: trimmedNewName } : null);
@@ -294,14 +294,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check for username uniqueness, excluding the current user's document if they already have one
       const usersRef = collection(db, "users");
       const qUsername = query(usersRef, where("username", "==", normalizedNewUsername));
       const usernameSnapshot = await getDocs(qUsername);
       
       let isTaken = false;
       usernameSnapshot.forEach(docSnap => {
-        if (docSnap.id !== currentUser.uid) { // Username is taken by someone else
+        if (docSnap.id !== currentUser.uid) { 
           isTaken = true;
         }
       });
@@ -311,7 +310,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const userDocRef = doc(db, "users", currentUser.uid);
-      const userDocSnap = await getDoc(userDocRef); // Get current doc to preserve other fields
+      const userDocSnap = await getDoc(userDocRef); 
 
       const firestoreData: any = {
         username: normalizedNewUsername,
@@ -321,14 +320,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userDocSnap.exists()) {
         await updateDoc(userDocRef, firestoreData);
       } else {
-        // This case should ideally not happen for a logged-in user, but handle defensively
         await setDoc(userDocRef, {
           uid: currentUser.uid,
           email: currentUser.email,
           displayName: currentUser.displayName,
           photoURL: currentUser.photoURL,
           bio: null,
-          ...firestoreData, // includes username and updatedAt
+          ...firestoreData, 
           createdAt: serverTimestamp(),
         });
       }
@@ -382,7 +380,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         birthDate: newBirthDate,
         updatedAt: serverTimestamp()
       };
-      await updateDoc(userDocRef, birthDateData); // Assumes doc exists for logged-in user
+      await updateDoc(userDocRef, birthDateData); 
       return { success: true };
     } catch (err: any) {
       console.warn(`AuthContext: Failed to update user birth date. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -402,7 +400,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         gender: newGender,
         updatedAt: serverTimestamp()
       };
-      await updateDoc(userDocRef, genderData); // Assumes doc exists
+      await updateDoc(userDocRef, genderData); 
       return { success: true };
     } catch (err: any) {
       console.warn(`AuthContext: Failed to update user gender. Error Code: ${err.code}, Message: ${err.message}`, err);
@@ -434,7 +432,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         updatedAt: serverTimestamp(),
       };
 
-      await updateDoc(userDocRef, firestoreData); // Assumes doc exists
+      await updateDoc(userDocRef, firestoreData); 
       await authUpdatePromise;
 
       setUser(prevUser => prevUser ? { ...prevUser, photoURL: downloadURL } : null);
@@ -474,7 +472,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         bio: newBio,
         updatedAt: serverTimestamp()
       };
-      await updateDoc(userDocRef, bioData); // Assumes doc exists
+      await updateDoc(userDocRef, bioData); 
       setUser(prevUser => prevUser ? { ...prevUser, bio: newBio } : null);
       return { success: true };
     } catch (err: any) {
@@ -485,23 +483,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (loading) return; // Wait for auth state to be determined
+    if (loading) return; 
 
-    const authPages = ['/login', '/register', '/reset-password', '/set-username'];
-    const isAuthPage = authPages.includes(pathname);
-    const isRootPage = pathname === '/';
+    const publicOnlyPages = ['/login', '/register', '/reset-password']; 
+    const setUsernamePage = '/set-username';
+    const rootPage = '/';
+    const currentPath = pathname; 
 
-    if (user) {
-      if (!user.username && pathname !== '/set-username' && !authPages.includes(pathname) && !isRootPage) {
-        // User logged in but no username, and not on set-username page or other auth pages
-        router.replace('/set-username');
-      } else if (isAuthPage || isRootPage) {
-        // User logged in and on an auth page or root, redirect to explore
-        router.replace('/explore');
+    if (user) { 
+      if (!user.username) { 
+        if (currentPath !== setUsernamePage) {
+          router.replace(setUsernamePage);
+        }
+      } else { 
+        if (publicOnlyPages.includes(currentPath) || currentPath === setUsernamePage || currentPath === rootPage) {
+          router.replace('/explore');
+        }
       }
-    } else {
-      // No user logged in
-      if (!isAuthPage && !isRootPage) { // Not on an auth page and not on root
+    } else { 
+      const isAppPage = !publicOnlyPages.includes(currentPath) && currentPath !== rootPage && currentPath !== setUsernamePage;
+      if (isAppPage) {
         router.replace('/login');
       }
     }
