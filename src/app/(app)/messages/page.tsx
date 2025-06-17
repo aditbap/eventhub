@@ -14,6 +14,7 @@ import type { Chat, ChatParticipant } from '@/types';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 interface ChatItemProps {
   chat: Chat;
@@ -24,13 +25,13 @@ const ChatListItem: React.FC<ChatItemProps> = ({ chat, currentUserUid }) => {
   const router = useRouter();
   const otherParticipantUid = chat.participants.find(p => p !== currentUserUid);
   
-  if (!otherParticipantUid) return null; // Should not happen in a valid chat
+  if (!otherParticipantUid) return null; 
 
   const otherParticipant = chat.participantDetails[otherParticipantUid];
 
   if (!otherParticipant) {
     console.warn("Other participant details not found for chat:", chat.id, "other UID:", otherParticipantUid);
-    return ( // Fallback rendering if details are somehow missing
+    return ( 
         <div className="p-3 bg-card rounded-lg shadow-sm hover:bg-muted/50 cursor-pointer animate-pulse">
             <div className="flex items-center space-x-3">
                 <Avatar className="h-12 w-12">
@@ -97,6 +98,7 @@ export default function MessagesPage() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loadingChats, setLoadingChats] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast(); // Initialize useToast
 
   useEffect(() => {
     if (!currentUser) {
@@ -120,13 +122,28 @@ export default function MessagesPage() {
       setChats(fetchedChats);
       setLoadingChats(false);
     }, (error) => {
-      console.error("Error fetching chats:", error);
+      console.error("Error fetching chats (onSnapshot):", error);
+      // More detailed logging for permission issues
+      if (error.code === 'permission-denied' || (error as any).code === 'failed-precondition') { // 'failed-precondition' can indicate missing index
+        console.error("Firestore permission error or missing index. Please check your Firestore rules and ensure the necessary composite index exists for 'chats' collection (participants array-contains, updatedAt desc).");
+        toast({
+            title: "Error Loading Chats",
+            description: "Could not load your conversations. This might be due to a permission issue or a missing database index. Please ensure you have the correct Firestore index: `chats` collection, fields `participants` (Array, Ascending) and `updatedAt` (Timestamp, Descending).",
+            variant: "destructive",
+            duration: 10000, // Show longer
+        });
+      } else {
+         toast({
+            title: "Error Loading Chats",
+            description: "An unexpected error occurred while loading your conversations.",
+            variant: "destructive",
+        });
+      }
       setLoadingChats(false);
-      // Handle error display, e.g., toast
     });
 
     return () => unsubscribe();
-  }, [currentUser, authLoading, router]);
+  }, [currentUser, authLoading, router, toast]);
 
   const filteredChats = chats.filter(chat => {
     if (!currentUser) return false;
