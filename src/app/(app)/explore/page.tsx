@@ -61,7 +61,7 @@ export default function ExplorePage() {
       try {
         const eventsColRef = collection(db, 'events');
         // Order by date ascending to easily find upcoming ones
-        const q = query(eventsColRef, orderBy('date', 'asc')); // Corrected: firestoreQuery -> query
+        const q = query(eventsColRef, orderBy('date', 'asc'));
         const querySnapshot = await getDocs(q);
         const fetchedEvents: Event[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
@@ -75,11 +75,8 @@ export default function ExplorePage() {
         });
         
         eventStore.setEvents(fetchedEvents); // Update eventStore with Firestore data
-        // We don't setAllEventsFromStore here directly, it's managed by subscribe
-        // setEventsForDisplay will be updated by the filtering useEffect
       } catch (error) {
         console.error("Error fetching events from Firestore:", error);
-        // Handle error (e.g., show toast)
       } finally {
         setIsLoadingEvents(false);
       }
@@ -114,8 +111,6 @@ export default function ExplorePage() {
       eventsToFilter = eventsToFilter.filter(event => event.category === currentCategory);
     }
     
-    // Already sorted by date from Firestore query if needed, or re-sort here
-    // For "Upcoming" and "Near You", specific date filtering is done below.
     setEventsForDisplay(eventsToFilter);
   }, [allEventsFromStore, currentCategory]);
 
@@ -223,7 +218,7 @@ export default function ExplorePage() {
               </Link>
             </div>
             {showSkeletons ? (
-              <div className="flex space-x-4 pb-4"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div> // Basic skeleton
+              <div className="flex space-x-4 pb-4"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
             ) : upcomingEvents.length > 0 ? (
               <ScrollArea className="w-full whitespace-nowrap rounded-md -mx-1 px-1">
                 <div className="flex space-x-4 pb-4">
@@ -248,7 +243,7 @@ export default function ExplorePage() {
               </Link>
             </div>
             {showSkeletons ? (
-                <div className="space-y-3"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div> // Basic skeleton
+                <div className="space-y-3"><Loader2 className="h-8 w-8 animate-spin text-primary"/></div>
             ) : nearYouEvents.length > 0 ? (
               <div className="space-y-3">
                 {nearYouEvents.map((event) => (
@@ -260,7 +255,7 @@ export default function ExplorePage() {
             )}
           </section>
         </div>
-      </main>
+      </motion.main>
 
       <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
         <SheetContent className="w-[320px] sm:w-[400px]">
@@ -271,7 +266,6 @@ export default function ExplorePage() {
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-6">
-            {/* Filter controls will be added here */}
             <div className="space-y-2">
               <Label htmlFor="filter-date">Date Range</Label>
               <Input id="filter-date" placeholder="Select dates (e.g., DatePicker)" disabled />
