@@ -12,6 +12,7 @@ import { collection, query, where, getDocs, limit, orderBy, startAt, endAt } fro
 import type { PublicUserProfile } from '@/types';
 import { UserListItem } from '@/components/profile/UserListItem';
 import { motion } from 'framer-motion';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SocialPage() {
   const router = useRouter();
@@ -20,6 +21,7 @@ export default function SocialPage() {
   const [searchResults, setSearchResults] = useState<PublicUserProfile[]>([]);
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const { toast } = useToast();
 
   const handleSearch = async (event?: FormEvent<HTMLFormElement>) => {
     if (event) event.preventDefault();
@@ -34,72 +36,80 @@ export default function SocialPage() {
     setHasSearched(true);
     try {
       const usersRef = collection(db, 'users');
-      const normalizedQueryLowercase = trimmedQuery.toLowerCase(); 
-      
-      // Query for displayName (prefix match, case-sensitive as per Firestore default for orderBy)
-      // To make it more flexible for display names, we could try common capitalizations,
-      // but a true case-insensitive prefix search on a non-lowercase field is tricky.
-      // This attempts a prefix match based on the query as typed.
-      const displayNameQuery = query(
+      const normalizedQueryLowercase = trimmedQuery.toLowerCase();
+      // Capitalize first letter, rest lowercase (e.g., "john doe" -> "John doe")
+      const normalizedQueryCapitalized = 
+        trimmedQuery.charAt(0).toUpperCase() + trimmedQuery.slice(1).toLowerCase();
+
+      const queriesToRun = [];
+
+      // 1. displayName query (as typed by user)
+      queriesToRun.push(query(
         usersRef,
         orderBy('displayName'),
         startAt(trimmedQuery),
-        endAt(trimmedQuery + '\uf8ff'), // '\uf8ff' is a very high code point character
+        endAt(trimmedQuery + '\uf8ff'),
         limit(10)
-      );
+      ));
 
-      // Query for username (prefix match on lowercase username)
-      // This assumes 'username' field in Firestore is stored in lowercase and is indexed for ordering.
-      const usernameQuery = query(
+      // 2. displayName query (capitalized version, if different from as-typed)
+      //    This helps if user types "john" and display name is "John"
+      if (trimmedQuery !== normalizedQueryCapitalized) {
+        queriesToRun.push(query(
+          usersRef,
+          orderBy('displayName'),
+          startAt(normalizedQueryCapitalized),
+          endAt(normalizedQueryCapitalized + '\uf8ff'),
+          limit(10)
+        ));
+      }
+      // Note: A true case-insensitive prefix search across all displayName variations in Firestore
+      // usually requires storing a normalized (e.g., lowercase) version of displayName for querying.
+
+      // 3. username query (lowercase prefix match)
+      //    Assumes 'username' field in Firestore is stored in lowercase and is indexed for ordering.
+      queriesToRun.push(query(
         usersRef,
         orderBy('username'), 
         startAt(normalizedQueryLowercase),
         endAt(normalizedQueryLowercase + '\uf8ff'),
         limit(10)
-      );
+      ));
       
-      const [displayNameSnap, usernameSnap] = await Promise.all([
-          getDocs(displayNameQuery),
-          getDocs(usernameQuery)
-      ]);
+      const querySnapshots = await Promise.all(queriesToRun.map(q => getDocs(q)));
 
       const usersMap = new Map<string, PublicUserProfile>();
 
-      // Process display name results
-      displayNameSnap.forEach((doc) => {
-        const data = doc.data();
-        if (doc.id !== currentUser?.uid) { 
-          usersMap.set(doc.id, {
-            uid: doc.id,
-            displayName: data.displayName || 'User',
-            username: data.username || null,
-            photoURL: data.photoURL || undefined,
-            bio: data.bio || undefined,
-          });
-        }
-      });
-
-      // Process username results, adding only if not already added
-      usernameSnap.forEach((doc) => {
-        const data = doc.data();
-        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { 
-          usersMap.set(doc.id, {
-            uid: doc.id,
-            displayName: data.displayName || 'User',
-            username: data.username || null,
-            photoURL: data.photoURL || undefined,
-            bio: data.bio || undefined,
-          });
-        }
+      querySnapshots.forEach(snapshot => {
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { // Exclude current user and avoid duplicates
+            usersMap.set(doc.id, {
+              uid: doc.id,
+              displayName: data.displayName || 'User',
+              username: data.username || null,
+              photoURL: data.photoURL || undefined,
+              bio: data.bio || undefined,
+            });
+          }
+        });
       });
 
       setSearchResults(Array.from(usersMap.values()));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error searching users:", error);
       setSearchResults([]);
-      // TODO: Optionally, set an error state to show a message to the user
-      // e.g., toast({ title: "Search Error", description: "Could not perform search.", variant: "destructive" });
+      toast({ 
+        title: "Search Error", 
+        description: error.code === 'failed-precondition' 
+          ? "The search query requires an index. Please check Firestore indexes. See console for details." 
+          : "Could not perform search. Please try again.", 
+        variant: "destructive" 
+      });
+      if (error.code === 'failed-precondition') {
+        console.warn("Firestore 'failed-precondition' error likely means a composite index is missing. Firebase might log a direct link to create it in this console.");
+      }
     } finally {
       setIsLoadingSearch(false);
     }
@@ -134,7 +144,7 @@ export default function SocialPage() {
         <form onSubmit={handleSearch} className="flex items-center space-x-2 mb-6">
           <Input
             type="search"
-            placeholder="Search by name or @username..."
+            placeholder="Search by start of name or @username..."
             className="flex-grow h-11 border-primary focus-visible:ring-primary"
             value={searchQuery}
             onChange={(e) => {
@@ -172,7 +182,7 @@ export default function SocialPage() {
             <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" strokeWidth={1.5}/>
             <p className="text-xl font-semibold text-muted-foreground">No users found</p>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-              Try a different name or username, or check your spelling. Remember, search looks for names/usernames that *start with* your term.
+              Try a different search term. Search looks for names or usernames that *start with* your term.
             </p>
           </div>
         ) : (
@@ -180,7 +190,7 @@ export default function SocialPage() {
                 <Users className="h-16 w-16 mx-auto text-primary/30 mb-4" strokeWidth={1.5}/>
                 <p className="text-xl font-semibold text-muted-foreground">Find People</p>
                 <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                Search by name or @username to connect with others.
+                Search by the beginning of a name or @username to connect with others.
                 </p>
           </div>
         )}
@@ -188,3 +198,4 @@ export default function SocialPage() {
     </motion.div>
   );
 }
+
