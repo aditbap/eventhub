@@ -189,22 +189,22 @@ export default function UserProfilePage() {
     console.log("[handleMessage] Initiating message attempt...");
 
     if (!currentUser) {
-      console.error("[handleMessage] Critical: currentUser is null. User not logged in.");
+      console.error("[handleMessage] Critical validation failed: currentUser is null. User not logged in.");
       toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
       return;
     }
     if (!profileUser) {
-      console.error("[handleMessage] Critical: profileUser is null. Cannot message this user.");
+      console.error("[handleMessage] Critical validation failed: profileUser is null. Cannot message this user.");
       toast({ title: "User Not Found", description: "Cannot find user to message.", variant: "destructive" });
       return;
     }
-     if (!currentUser.uid || typeof currentUser.uid !== 'string') {
-      console.error("[handleMessage] Critical: currentUser.uid is invalid:", currentUser.uid);
+     if (!currentUser.uid || typeof currentUser.uid !== 'string' || currentUser.uid.trim() === '') {
+      console.error("[handleMessage] Critical validation failed: currentUser.uid is invalid:", currentUser.uid);
       toast({ title: "Error", description: "Your user ID is invalid. Please re-login.", variant: "destructive" });
       return;
     }
-    if (!profileUser.uid || typeof profileUser.uid !== 'string') {
-      console.error("[handleMessage] Critical: profileUser.uid is invalid:", profileUser.uid);
+    if (!profileUser.uid || typeof profileUser.uid !== 'string' || profileUser.uid.trim() === '') {
+      console.error("[handleMessage] Critical validation failed: profileUser.uid is invalid:", profileUser.uid);
       toast({ title: "Error", description: "Target user ID is invalid.", variant: "destructive" });
       return;
     }
@@ -214,43 +214,52 @@ export default function UserProfilePage() {
       return;
     }
 
-    console.log(`[handleMessage] Current User UID: ${currentUser.uid} (Type: ${typeof currentUser.uid})`);
-    console.log(`[handleMessage] Profile User UID: ${profileUser.uid} (Type: ${typeof profileUser.uid})`);
+    console.log(`[handleMessage] Current User UID: '${currentUser.uid}' (Type: ${typeof currentUser.uid})`);
+    console.log(`[handleMessage] Profile User UID: '${profileUser.uid}' (Type: ${typeof profileUser.uid})`);
     console.log(`[handleMessage] Current User DisplayName: ${currentUser.displayName}, Username: ${currentUser.username || 'N/A'}`);
     console.log(`[handleMessage] Profile User DisplayName: ${profileUser.displayName}, Username: ${profileUser.username || 'N/A'}`);
 
     const chatId = getChatId(currentUser.uid, profileUser.uid);
     console.log("[handleMessage] Generated Chat ID:", chatId);
     if (!chatId || typeof chatId !== 'string' || chatId.split('_').length !== 2) {
-        console.error("[handleMessage] Critical: Generated chatId is invalid:", chatId);
+        console.error("[handleMessage] Critical validation failed: Generated chatId is invalid:", chatId);
         toast({ title: "Error", description: "Could not generate a valid chat ID.", variant: "destructive" });
         return;
     }
 
     const chatDocRef = doc(db, 'chats', chatId);
     
+    // Explicitly use the UIDs that will form the participants array for participantDetails keys
+    const uid1 = currentUser.uid;
+    const uid2 = profileUser.uid;
+
     const currentUserDetails: ChatParticipant = {
-        uid: currentUser.uid,
+        uid: uid1,
         displayName: currentUser.displayName || null,
         photoURL: currentUser.photoURL || null,
         username: currentUser.username || null
     };
     const profileUserDetails: ChatParticipant = {
-        uid: profileUser.uid,
+        uid: uid2,
         displayName: profileUser.displayName || null,
         photoURL: profileUser.photoURL || null,
         username: profileUser.username || null
     };
 
-    const participantsArray = [currentUser.uid, profileUser.uid];
+    const participantsArray = [uid1, uid2];
     const sortedParticipantsArray = [...participantsArray].sort();
 
     console.log("[handleMessage] Participants array (unsorted):", participantsArray);
     console.log("[handleMessage] Sorted participants array:", sortedParticipantsArray);
-    console.log("[handleMessage] Verifying sortedParticipantsArray content - UID1 type:", typeof sortedParticipantsArray[0], "UID2 type:", typeof sortedParticipantsArray[1]);
-    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string') {
-        console.error("[handleMessage] Critical: sortedParticipantsArray is malformed:", sortedParticipantsArray);
-        toast({ title: "Error", description: "Failed to prepare participant list for chat.", variant: "destructive" });
+
+    if (sortedParticipantsArray.length !== 2 || typeof sortedParticipantsArray[0] !== 'string' || typeof sortedParticipantsArray[1] !== 'string' || sortedParticipantsArray[0].trim() === '' || sortedParticipantsArray[1].trim() === '') {
+        console.error("[handleMessage] Critical validation failed: sortedParticipantsArray is malformed or contains invalid UIDs:", sortedParticipantsArray);
+        toast({ title: "Error", description: "Failed to prepare participant list for chat due to invalid UIDs.", variant: "destructive" });
+        return;
+    }
+    if (sortedParticipantsArray[0] === sortedParticipantsArray[1]) {
+        console.error("[handleMessage] Critical validation failed: sortedParticipantsArray contains duplicate UIDs:", sortedParticipantsArray);
+        toast({ title: "Error", description: "Cannot create chat with duplicate participants.", variant: "destructive" });
         return;
     }
     
@@ -258,30 +267,32 @@ export default function UserProfilePage() {
     console.log("Rule: allow create: if request.auth != null && request.auth.uid in request.resource.data.participants && request.resource.data.participants.size() == 2;");
     console.log("--- Client-side data for comparison ---");
     console.log(`1. request.auth != null (client assumes): ${currentUser ? 'true' : 'false'}`);
-    console.log(`2. request.auth.uid (client-side perspective):`, currentUser?.uid);
-    console.log(`   request.resource.data.participants (to be written):`, sortedParticipantsArray);
-    console.log(`   Is currentUser.uid in sortedParticipantsArray?: ${currentUser ? sortedParticipantsArray.includes(currentUser.uid) : 'N/A'}`);
+    console.log(`2. request.auth.uid (client-side perspective): '${currentUser?.uid}'`);
+    console.log(`   request.resource.data.participants (to be written): ['${sortedParticipantsArray[0]}', '${sortedParticipantsArray[1]}']`);
+    const isAuthUidInParticipants = currentUser ? sortedParticipantsArray.includes(currentUser.uid) : false;
+    console.log(`   Is currentUser.uid in sortedParticipantsArray?: ${isAuthUidInParticipants}`);
     console.log(`3. request.resource.data.participants.size() (to be written): ${sortedParticipantsArray.length}`);
     console.log("--- End of client-side pre-check ---");
 
-
     const chatDataToWrite = {
-        participants: sortedParticipantsArray,
+        participants: sortedParticipantsArray, // Ensure this is what's written
         participantDetails: {
-            [currentUser.uid]: currentUserDetails,
-            [profileUser.uid]: profileUserDetails,
+            [uid1]: currentUserDetails, // Use the exact UIDs
+            [uid2]: profileUserDetails
         },
-        updatedAt: serverTimestamp(), // Firestore Server Timestamp
+        updatedAt: serverTimestamp(), 
         lastMessage: null, 
         unreadCounts: {
-            [currentUser.uid]: 0,
-            [profileUser.uid]: 0,
+            [uid1]: 0,
+            [uid2]: 0,
         }
     };
     
+    console.log("[handleMessage] Final `participants` array in chatDataToWrite:", chatDataToWrite.participants);
+    console.log("[handleMessage] Keys in `participantDetails`:", Object.keys(chatDataToWrite.participantDetails));
     console.log("[handleMessage] Full data object being sent to setDoc (chatDataToWrite):", JSON.stringify(chatDataToWrite, (key, value) => {
       if (key === 'updatedAt' && value && typeof value === 'object' && value.constructor && value.constructor.name === 'FieldValue') {
-        return `Firestore.ServerTimestamp`; // Placeholder for logging
+        return `Firestore.ServerTimestamp`; 
       }
       return value;
     }, 2));
