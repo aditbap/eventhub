@@ -26,7 +26,7 @@ export default function SocialPage() {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) {
       setSearchResults([]);
-      setHasSearched(true); // Considered a search, even if empty query leading to no results shown
+      setHasSearched(true); 
       return;
     }
 
@@ -34,22 +34,27 @@ export default function SocialPage() {
     setHasSearched(true);
     try {
       const usersRef = collection(db, 'users');
-      const normalizedQuery = trimmedQuery.toLowerCase(); // For username search
-
-      // Query for display name (case-insensitive prefix - harder in Firestore directly)
-      // We'll do a "starts with" for display name, and exact match for lowercase username
+      const normalizedQueryLowercase = trimmedQuery.toLowerCase(); 
+      
+      // Query for displayName (prefix match, case-sensitive as per Firestore default for orderBy)
+      // To make it more flexible for display names, we could try common capitalizations,
+      // but a true case-insensitive prefix search on a non-lowercase field is tricky.
+      // This attempts a prefix match based on the query as typed.
       const displayNameQuery = query(
         usersRef,
         orderBy('displayName'),
-        startAt(trimmedQuery), // Case-sensitive start for display name
-        endAt(trimmedQuery + '\uf8ff'),
+        startAt(trimmedQuery),
+        endAt(trimmedQuery + '\uf8ff'), // '\uf8ff' is a very high code point character
         limit(10)
       );
 
-      // Query for username (exact match, case-insensitive by searching lowercase)
+      // Query for username (prefix match on lowercase username)
+      // This assumes 'username' field in Firestore is stored in lowercase and is indexed for ordering.
       const usernameQuery = query(
         usersRef,
-        where('username', '==', normalizedQuery), // Assumes username in Firestore is lowercase
+        orderBy('username'), 
+        startAt(normalizedQueryLowercase),
+        endAt(normalizedQueryLowercase + '\uf8ff'),
         limit(10)
       );
       
@@ -60,9 +65,10 @@ export default function SocialPage() {
 
       const usersMap = new Map<string, PublicUserProfile>();
 
+      // Process display name results
       displayNameSnap.forEach((doc) => {
         const data = doc.data();
-        if (doc.id !== currentUser?.uid) { // Exclude current user
+        if (doc.id !== currentUser?.uid) { 
           usersMap.set(doc.id, {
             uid: doc.id,
             displayName: data.displayName || 'User',
@@ -73,9 +79,10 @@ export default function SocialPage() {
         }
       });
 
+      // Process username results, adding only if not already added
       usernameSnap.forEach((doc) => {
         const data = doc.data();
-        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { // Exclude current user and avoid duplicates
+        if (doc.id !== currentUser?.uid && !usersMap.has(doc.id)) { 
           usersMap.set(doc.id, {
             uid: doc.id,
             displayName: data.displayName || 'User',
@@ -91,17 +98,16 @@ export default function SocialPage() {
     } catch (error) {
       console.error("Error searching users:", error);
       setSearchResults([]);
-      // Optionally, set an error state to show a message to the user
+      // TODO: Optionally, set an error state to show a message to the user
+      // e.g., toast({ title: "Search Error", description: "Could not perform search.", variant: "destructive" });
     } finally {
       setIsLoadingSearch(false);
     }
   };
   
-  // Clear results if search query is cleared after a search has been made
   useEffect(() => {
     if (searchQuery.trim() === '' && hasSearched && !isLoadingSearch) {
         setSearchResults([]);
-        // setHasSearched(false); // Optionally reset hasSearched if you want the initial prompt back
     }
   }, [searchQuery, hasSearched, isLoadingSearch]);
 
@@ -133,9 +139,9 @@ export default function SocialPage() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (e.target.value.trim() === '') { // If input is cleared, reset search state
+              if (e.target.value.trim() === '') { 
                 setSearchResults([]);
-                setHasSearched(false); // Allow initial prompt to show again
+                setHasSearched(false); 
               }
             }}
           />
@@ -150,14 +156,14 @@ export default function SocialPage() {
           </div>
         ) : searchResults.length > 0 ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground mb-2">Found {searchResults.length} user(s):</p>
+            <p className="text-sm text-muted-foreground mb-2">Found {searchResults.length} user(s) starting with "{searchQuery}":</p>
             {searchResults.map((user) => (
               <UserListItem 
                 key={user.uid} 
                 profileUser={user} 
                 currentUserUid={currentUser?.uid}
                 onFollowStateChange={() => { /* Optionally refetch or update counts */ }}
-                showFollowButton={!!currentUser && user.uid !== currentUser.uid} // Show follow button if not the current user
+                showFollowButton={!!currentUser && user.uid !== currentUser.uid}
               />
             ))}
           </div>
@@ -166,11 +172,10 @@ export default function SocialPage() {
             <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" strokeWidth={1.5}/>
             <p className="text-xl font-semibold text-muted-foreground">No users found</p>
             <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-              Try a different name or username, or check your spelling.
+              Try a different name or username, or check your spelling. Remember, search looks for names/usernames that *start with* your term.
             </p>
           </div>
         ) : (
-            // Initial state: prompt to search
             <div className="text-center py-10 bg-card rounded-xl shadow-sm">
                 <Users className="h-16 w-16 mx-auto text-primary/30 mb-4" strokeWidth={1.5}/>
                 <p className="text-xl font-semibold text-muted-foreground">Find People</p>
@@ -183,4 +188,3 @@ export default function SocialPage() {
     </motion.div>
   );
 }
-
