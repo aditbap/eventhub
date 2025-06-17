@@ -5,8 +5,8 @@ export interface ChatMessage {
   id: string; // Firestore document ID of the message
   chatId: string; // ID of the chat this message belongs to
   senderId: string;
-  senderName?: string; // Optional: denormalized sender name
-  senderAvatar?: string | null; // Optional: denormalized sender avatar
+  senderName?: string; // Denormalized sender name
+  senderAvatar?: string | null; // Denormalized sender avatar
   text: string;
   timestamp: Timestamp | Date; // Firestore Timestamp or Date object for client-side
   isRead?: boolean; // Optional: for read receipts
@@ -20,10 +20,17 @@ export interface ChatParticipant {
 }
 
 export interface Chat {
-  id: string; // Firestore document ID (e.g., uid1_uid2)
+  id: string; // Firestore document ID (e.g., uid1_uid2 sorted)
   participants: string[]; // Array of two user UIDs
-  participantDetails: ChatParticipant[]; // Array of participant details
-  lastMessage?: Pick<ChatMessage, 'text' | 'senderId' | 'timestamp'> & { senderName?: string };
+  participantDetails: { // Store details of both participants for easy access
+    [key: string]: ChatParticipant; // Keyed by UID
+  };
+  lastMessage?: {
+    text: string;
+    senderId: string;
+    senderName?: string; // Denormalized sender name for quick display
+    timestamp: Timestamp | Date;
+  };
   updatedAt: Timestamp | Date; // For sorting chats
-  // unreadCounts?: { [userId: string]: number }; // Optional: for unread message counts
+  unreadCounts?: { [userId: string]: number }; // Optional: for unread message counts per user
 }

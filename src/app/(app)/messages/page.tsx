@@ -1,29 +1,143 @@
 
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MessageSquarePlus, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ArrowLeft, MessageSquarePlus, Search, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { collection, query, where, orderBy, onSnapshot, type Timestamp } from 'firebase/firestore';
+import type { Chat, ChatParticipant } from '@/types';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
-// Placeholder: In a real app, you'd fetch and display actual chats here
-const PlaceholderChats = () => (
-  <div className="text-center py-10 text-muted-foreground bg-card rounded-lg shadow-sm mt-6">
-    <MessageSquarePlus className="h-16 w-16 mx-auto mb-4 opacity-30" />
-    <p className="text-xl font-semibold">No Messages Yet</p>
-    <p className="text-sm mt-1">
-      Start a new conversation from a user's profile or the social search page.
-    </p>
-  </div>
-);
+interface ChatItemProps {
+  chat: Chat;
+  currentUserUid: string;
+}
+
+const ChatListItem: React.FC<ChatItemProps> = ({ chat, currentUserUid }) => {
+  const router = useRouter();
+  const otherParticipantUid = chat.participants.find(p => p !== currentUserUid);
+  
+  if (!otherParticipantUid) return null; // Should not happen in a valid chat
+
+  const otherParticipant = chat.participantDetails[otherParticipantUid];
+
+  if (!otherParticipant) {
+    console.warn("Other participant details not found for chat:", chat.id, "other UID:", otherParticipantUid);
+    return ( // Fallback rendering if details are somehow missing
+        <div className="p-3 bg-card rounded-lg shadow-sm hover:bg-muted/50 cursor-pointer animate-pulse">
+            <div className="flex items-center space-x-3">
+                <Avatar className="h-12 w-12">
+                    <AvatarFallback>?</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate text-foreground">Loading...</p>
+                    <p className="text-sm text-muted-foreground truncate">Loading message...</p>
+                </div>
+            </div>
+        </div>
+    );
+  }
+
+  const lastMessageText = chat.lastMessage?.text || 'No messages yet.';
+  const lastMessageTimestamp = chat.lastMessage?.timestamp
+    ? formatDistanceToNowStrict(new Date((chat.lastMessage.timestamp as Timestamp).toDate()), { addSuffix: true })
+    : '';
+  const isLastMessageFromCurrentUser = chat.lastMessage?.senderId === currentUserUid;
+  const lastMessageSenderName = isLastMessageFromCurrentUser ? "You" : chat.lastMessage?.senderName;
+  const displayLastMessage = lastMessageSenderName ? `${lastMessageSenderName}: ${lastMessageText}` : lastMessageText;
+
+  const unreadCount = chat.unreadCounts?.[currentUserUid] || 0;
+
+  return (
+    <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        onClick={() => router.push(`/messages/${chat.id}`)}
+        className={cn(
+            "p-3 rounded-lg shadow-sm cursor-pointer transition-all duration-200 ease-in-out",
+            unreadCount > 0 ? "bg-primary/10 hover:bg-primary/20" : "bg-card hover:bg-muted/50"
+        )}
+    >
+      <div className="flex items-center space-x-3">
+        <Avatar className="h-12 w-12">
+          <AvatarImage src={otherParticipant.photoURL || `https://placehold.co/48x48.png?text=${otherParticipant.displayName?.charAt(0)}`} alt={otherParticipant.displayName || 'User'} data-ai-hint="chat partner avatar"/>
+          <AvatarFallback>{otherParticipant.displayName?.charAt(0) || 'U'}</AvatarFallback>
+        </Avatar>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center">
+            <p className="font-semibold truncate text-foreground">{otherParticipant.displayName || 'Chat User'}</p>
+            {lastMessageTimestamp && <p className="text-xs text-muted-foreground flex-shrink-0 ml-2">{lastMessageTimestamp}</p>}
+          </div>
+          <p className={cn("text-sm truncate", unreadCount > 0 ? "text-primary font-medium" : "text-muted-foreground")}>
+            {displayLastMessage}
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <div className="bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
 
 export default function MessagesPage() {
   const router = useRouter();
+  const { user: currentUser, loading: authLoading } = useAuth();
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Placeholder data - replace with actual chat fetching logic
-  const chats: any[] = []; // e.g., fetch from Firestore
-  const isLoading = false; // e.g., loading state from fetch
+  useEffect(() => {
+    if (!currentUser) {
+      if (!authLoading) router.replace('/login');
+      return;
+    }
+
+    setLoadingChats(true);
+    const chatsRef = collection(db, 'chats');
+    const q = query(
+      chatsRef,
+      where('participants', 'array-contains', currentUser.uid),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const fetchedChats: Chat[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedChats.push({ id: doc.id, ...doc.data() } as Chat);
+      });
+      setChats(fetchedChats);
+      setLoadingChats(false);
+    }, (error) => {
+      console.error("Error fetching chats:", error);
+      setLoadingChats(false);
+      // Handle error display, e.g., toast
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, authLoading, router]);
+
+  const filteredChats = chats.filter(chat => {
+    if (!currentUser) return false;
+    const otherParticipantUid = chat.participants.find(p => p !== currentUser.uid);
+    if (!otherParticipantUid) return false;
+    const otherParticipant = chat.participantDetails[otherParticipantUid];
+    if (!otherParticipant) return false;
+    
+    return (otherParticipant.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+           (otherParticipant.username || '').toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <motion.div
@@ -42,33 +156,39 @@ export default function MessagesPage() {
         </Button>
       </header>
 
-      <main className="flex-grow p-4 pb-20">
-        {/* Placeholder for search/filter bar for chats */}
-        {/* <Input placeholder="Search chats..." className="mb-4" /> */}
+      <main className="flex-grow p-4 pb-20 space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Search chats..." 
+            className="pl-10 h-11"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
         
-        {isLoading ? (
-          <p>Loading chats...</p>
-        ) : chats.length === 0 ? (
-          <PlaceholderChats />
+        {loadingChats ? (
+          <div className="flex justify-center items-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredChats.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground bg-card rounded-lg shadow-sm mt-6">
+            <MessageSquarePlus className="h-16 w-16 mx-auto mb-4 opacity-30" />
+            <p className="text-xl font-semibold">
+                {searchTerm ? 'No chats match your search' : 'No Messages Yet'}
+            </p>
+            <p className="text-sm mt-1">
+              {searchTerm ? 'Try a different search term.' : 'Start a new conversation from a user\'s profile or the social search page.'}
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
-            {/* Map through actual chats here */}
-            {/* Example:
-            {chats.map(chat => (
-              <ChatItem key={chat.id} chat={chat} />
+            {currentUser && filteredChats.map(chat => (
+              <ChatListItem key={chat.id} chat={chat} currentUserUid={currentUser.uid}/>
             ))}
-            */}
           </div>
         )}
       </main>
     </motion.div>
   );
 }
-
-// Placeholder ChatItem component (to be implemented later)
-// const ChatItem = ({ chat }: { chat: any }) => (
-//   <div className="p-3 bg-card rounded-lg shadow-sm hover:bg-muted/50 cursor-pointer">
-//     <p className="font-semibold">{chat.otherUserName || 'Chat'}</p>
-//     <p className="text-sm text-muted-foreground truncate">{chat.lastMessage?.text || 'No messages yet'}</p>
-//   </div>
-// );

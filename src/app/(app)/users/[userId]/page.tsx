@@ -5,9 +5,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import type { Event, Notification, PublicUserProfile } from '@/types';
+import type { Event, Notification, PublicUserProfile, ChatParticipant } from '@/types'; // Added ChatParticipant
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, writeBatch, serverTimestamp, addDoc, setDoc } from 'firebase/firestore'; // Added setDoc
 import { eventStore } from '@/lib/eventStore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -181,13 +181,51 @@ export default function UserProfilePage() {
     }
   };
   
-  const handleMessage = () => {
+  const handleMessage = async () => {
     if (!currentUser || !profileUser || currentUser.uid === profileUser.uid) {
       if (!currentUser) toast({ title: "Login Required", description: "Please log in to send messages.", variant: "destructive" });
       return;
     }
     const chatId = getChatId(currentUser.uid, profileUser.uid);
-    router.push(`/messages/${chatId}`);
+    const chatDocRef = doc(db, 'chats', chatId);
+    
+    try {
+        const chatDocSnap = await getDoc(chatDocRef);
+        if (!chatDocSnap.exists()) {
+            // Chat doesn't exist, create it before navigating
+            const currentUserDetails: ChatParticipant = {
+                uid: currentUser.uid,
+                displayName: currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                username: currentUser.username
+            };
+            const profileUserDetails: ChatParticipant = {
+                uid: profileUser.uid,
+                displayName: profileUser.displayName,
+                photoURL: profileUser.photoURL,
+                username: profileUser.username
+            };
+
+            await setDoc(chatDocRef, {
+                participants: [currentUser.uid, profileUser.uid].sort(),
+                participantDetails: {
+                    [currentUser.uid]: currentUserDetails,
+                    [profileUser.uid]: profileUserDetails,
+                },
+                updatedAt: serverTimestamp(),
+                lastMessage: null, // No last message yet
+                unreadCounts: {
+                    [currentUser.uid]: 0,
+                    [profileUser.uid]: 0,
+                }
+            });
+            console.log("Created new chat document:", chatId);
+        }
+        router.push(`/messages/${chatId}`);
+    } catch (error) {
+        console.error("Error ensuring chat exists or navigating:", error);
+        toast({ title: "Error", description: "Could not start conversation.", variant: "destructive" });
+    }
   };
 
   const isCurrentUserProfile = useMemo(() => currentUser?.uid === userId, [currentUser, userId]);
