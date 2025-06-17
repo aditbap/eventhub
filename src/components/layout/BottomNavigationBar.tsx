@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { href: '/explore', label: 'Explore', icon: Compass },
   { href: '/events', label: 'Events', icon: CalendarDays },
   { href: '/create', label: 'Create', icon: Plus, isCreateButton: true },
+  { href: '/social', label: 'Social', icon: Users },
   { href: '/profile', label: 'Profile', icon: UserCircle },
 ];
 
@@ -75,4 +76,3 @@ export function BottomNavigationBar() {
     </nav>
   );
 }
-
