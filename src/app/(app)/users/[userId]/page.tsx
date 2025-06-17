@@ -195,15 +195,15 @@ export default function UserProfilePage() {
             // Chat doesn't exist, create it before navigating
             const currentUserDetails: ChatParticipant = {
                 uid: currentUser.uid,
-                displayName: currentUser.displayName,
-                photoURL: currentUser.photoURL,
-                username: currentUser.username
+                displayName: currentUser.displayName || 'User', // Fallback
+                photoURL: currentUser.photoURL || null,        // Fallback to null
+                username: currentUser.username || null         // Fallback to null
             };
             const profileUserDetails: ChatParticipant = {
                 uid: profileUser.uid,
-                displayName: profileUser.displayName,
-                photoURL: profileUser.photoURL,
-                username: profileUser.username
+                displayName: profileUser.displayName || 'User', // Fallback
+                photoURL: profileUser.photoURL || null,        // Fallback to null
+                username: profileUser.username || null         // Fallback to null
             };
 
             await setDoc(chatDocRef, {
@@ -213,7 +213,7 @@ export default function UserProfilePage() {
                     [profileUser.uid]: profileUserDetails,
                 },
                 updatedAt: serverTimestamp(),
-                lastMessage: null, // No last message yet
+                lastMessage: null, 
                 unreadCounts: {
                     [currentUser.uid]: 0,
                     [profileUser.uid]: 0,
@@ -378,3 +378,5 @@ export default function UserProfilePage() {
     </motion.div>
   );
 }
+
+  
