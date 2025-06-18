@@ -3,6 +3,9 @@
 
 import { NextResponse } from 'next/server';
 import Midtrans from 'midtrans-client';
+import { db } from '@/lib/firebase'; // Import db
+import { doc, getDoc } from 'firebase/firestore'; // Import getDoc and doc
+import type { Event } from '@/types'; // Import Event type
 
 // Ambil konfigurasi dari environment variables
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY;
@@ -40,27 +43,46 @@ interface CreateTransactionBody {
 export async function POST(request: Request) {
   try {
     const body: CreateTransactionBody = await request.json();
-    const { 
-      eventId, 
-      eventTitle, 
-      eventPrice, 
+    const {
+      eventId,
+      eventTitle,
+      eventPrice,
       eventDate,
       eventTime,
       eventLocation,
-      userId, 
-      userEmail, 
-      userName, 
-      userPhone 
+      userId,
+      userEmail,
+      userName,
+      userPhone
     } = body;
 
     if (!eventId || !eventTitle || eventPrice === undefined || !eventDate || !eventLocation || !userId || !userEmail || !userName) {
       return NextResponse.json({ error: 'Missing required transaction details' }, { status: 400 });
     }
-    
+
+    // Fetch event details to get creatorId
+    let eventCreatorId: string | undefined;
+    try {
+      const eventDocRef = doc(db, 'events', eventId);
+      const eventDocSnap = await getDoc(eventDocRef);
+      if (eventDocSnap.exists()) {
+        const eventData = eventDocSnap.data() as Event;
+        eventCreatorId = eventData.creatorId;
+      } else {
+        console.warn(`[API Create-Transaction] Event with ID ${eventId} not found.`);
+        // Decide if this is a critical error or if transaction can proceed without creatorId for webhook
+        // For now, let's allow it but log. Webhook might fail to notify organizer if creatorId is missing.
+      }
+    } catch (fetchError) {
+        console.error(`[API Create-Transaction] Error fetching event ${eventId}:`, fetchError);
+        // Similar decision: proceed or fail
+    }
+
+
     if (!snap) {
       console.log("[API STUB / CREATE-TRANSACTION] Midtrans server not configured. Returning dummy SnapToken for UI testing.");
       const dummyOrderId = `DUMMY-ORDER-${eventId.slice(0,5)}-${userId.slice(0,5)}-${Date.now()}`;
-      const dummySnapToken = `dummy-snap-token-${dummyOrderId}`; 
+      const dummySnapToken = `dummy-snap-token-${dummyOrderId}`;
       return NextResponse.json({ snapToken: dummySnapToken });
     }
 
@@ -68,10 +90,11 @@ export async function POST(request: Request) {
 
     const customField1Data = {
       eventId: eventId,
-      userId: userId,
+      userId: userId, // This is the registrant's UID
       eventDate: eventDate,
-      eventTime: eventTime || null, // Ensure time is passed or null
+      eventTime: eventTime || null,
       eventLocation: eventLocation,
+      eventCreatorId: eventCreatorId || null, // Add creatorId here
     };
 
     const parameter = {
@@ -80,20 +103,20 @@ export async function POST(request: Request) {
         gross_amount: eventPrice,
       },
       item_details: [{
-        id: eventId, // Usually the product ID
+        id: eventId,
         price: eventPrice,
         quantity: 1,
         name: eventTitle,
-        merchant_name: "UPJ Event Hub" 
+        merchant_name: "UPJ Event Hub"
       }],
       customer_details: {
         first_name: userName,
         email: userEmail,
-        phone: userPhone || undefined, 
+        phone: userPhone || undefined,
       },
       custom_field1: JSON.stringify(customField1Data),
       callbacks: {
-        // finish: 'YOUR_APP_FINISH_REDIRECT_URL' // e.g., https://upjevent.vercel.app/profile/my-tickets
+        // finish: 'YOUR_APP_FINISH_REDIRECT_URL'
       },
     };
 
@@ -110,4 +133,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message || 'Failed to create Midtrans transaction' }, { status: 500 });
   }
 }
-    
